@@ -14,7 +14,7 @@ tags: [go, vue3, sqlite, embed]
 ## 拓扑
 
 ```
-                    ┌──────────────── land.exe (LocalSystem) ────────────────┐
+                    ┌──────────────── lanDisk.exe (LocalSystem) ────────────────┐
 浏览器 ── HTTP ──▶  │ 中间件链 ─▶ httpapi ─▶ files / upload / trash / admin  │
 (匿名 / admin)      │              │              │                          │
                     │              └──▶ store (SQLite: land.db)              │
@@ -28,11 +28,11 @@ tags: [go, vue3, sqlite, embed]
 
 ## 运行期文件
 
-**程序目录里运行期只有两个文件：`land.exe` 与 `land.db`。** 没有 `config.json`、没有口令文件、没有 temp 目录、没有日志副本。
+**程序目录里运行期只有两个文件：`lanDisk.exe` 与 `land.db`。** 没有 `config.json`、没有口令文件、没有 temp 目录、没有日志副本。
 
 | 位置 | 文件 | 说明 |
 |---|---|---|
-| exe 同级 | `land.exe` | 程序本体（内嵌前端与预览资源） |
+| exe 同级 | `lanDisk.exe` | 程序本体（内嵌前端与预览资源） |
 | exe 同级 | `land.db` | **唯一真源**：配置、共享、规则、备注、账号、会话、上传会话、回收站元数据、日志、IP 规则、主机名映射，全部在这里 |
 | 共享根内 | `<共享根>/.land-trash/` | 该共享的回收站（必须在同一卷才 `rename` 得动） |
 | 共享根内 | `<目标名>.landpart-<uploadID>` · `<目标名>.landrestore-<id>` | 上传分块与跨卷恢复临时文件，写完即改名，列表与搜索中不可见 |
@@ -49,17 +49,17 @@ tags: [go, vue3, sqlite, embed]
 2. 打开 SQLite（WAL + `busy_timeout`），执行迁移，缺省 `settings` 行补齐。
 3. 从 `settings.port` 读监听端口（默认 80）。
 
-配置项全在 `settings` 表，有且只有两个写者：在线写 `PUT /api/admin/settings`，离线急救写 `land.exe config set`——两者走同一个 store 方法，不各写一套。**当配置把服务启动搞坏时（端口被占、IP 白名单把自己锁在外面），救援手段是本机命令行**，不靠改文件：
+配置项全在 `settings` 表，有且只有两个写者：在线写 `PUT /api/admin/settings`，离线急救写 `lanDisk.exe config set`——两者走同一个 store 方法，不各写一套。**当配置把服务启动搞坏时（端口被占、IP 白名单把自己锁在外面），救援手段是本机命令行**，不靠改文件：
 
 | 子命令 | 用途 |
 |---|---|
-| `land.exe`（无参） | 前台调试运行（不注册服务），日志直接打到控制台 |
-| `land.exe install` / `uninstall` | 注册/注销 Windows 服务（LocalSystem，开机自启） |
-| `land.exe reset-password` | 生成新管理员口令并打印到控制台、置 `must_change=1`；首启口令也这样拿 |
-| `land.exe config get\|set <key> [value]` | 直接读写 `settings`，用于端口/白名单急救 |
-| `land.exe version` | 版本与构建信息 |
+| `lanDisk.exe`（无参） | 前台调试运行（不注册服务），日志直接打到控制台 |
+| `lanDisk.exe install` / `uninstall` | 注册/注销 Windows 服务（LocalSystem，开机自启） |
+| `lanDisk.exe reset-password` | 生成新管理员口令并打印到控制台、置 `must_change=1`；首启口令也这样拿 |
+| `lanDisk.exe config get\|set <key> [value]` | 直接读写 `settings`，用于端口/白名单急救 |
+| `lanDisk.exe version` | 版本与构建信息 |
 
-首启没有 `users` 行时自动创建 admin + 随机口令 + `must_change=1`，控制台（服务模式下是事件日志）只提示"用 `land.exe reset-password` 获取口令"，不把口令写进任何文件。
+首启没有 `users` 行时自动创建 admin + 随机口令 + `must_change=1`，控制台（服务模式下是事件日志）只提示"用 `lanDisk.exe reset-password` 获取口令"，不把口令写进任何文件。
 
 ## 组件与边界
 
@@ -209,7 +209,7 @@ logs(id INTEGER PK, ts INT, ip TEXT, host TEXT, action TEXT, share_id INT, path 
 ```
 bun install && bun run build   → web/dist
 bun run build:preview          → preview-assets/（FileViewer 自托管资源）
-go build -trimpath -ldflags "-s -w -X main.version=..."  → land.exe
+go build -trimpath -ldflags "-s -w -X main.version=..."  → lanDisk.exe
 ```
 
 `web/dist` 与 `preview-assets` 通过 `go:embed` 内嵌；embed 目录需在构建前存在（放一个占位文件保证没跑前端构建时 `go build` 也不炸）。`-trimpath` + 版本号注入让产物可复现。目标平台 `windows/amd64`（`arm64` 顺带可编译），其余平台允许前台模式运行但不注册服务。
@@ -218,14 +218,14 @@ go build -trimpath -ldflags "-s -w -X main.version=..."  → land.exe
 
 以下三点不在文档阶段定稿，由实现与测试确定（不变更本文件的边界与拓扑）：
 
-- **`settings` 的双写者**：后台接口与 `land.exe config set` 都写 `settings`（CLI 是离线急救通道），实现时两者走同一个 store 方法；服务在线时 CLI 写入后提示“重启生效”，不做热加载——避免文档里“唯一写入方”与急救命令互相矛盾。
+- **`settings` 的双写者**：后台接口与 `lanDisk.exe config set` 都写 `settings`（CLI 是离线急救通道），实现时两者走同一个 store 方法；服务在线时 CLI 写入后提示“重启生效”，不做热加载——避免文档里“唯一写入方”与急救命令互相矛盾。
 - **挂载点发现与主机名刷新**：`share_mounts` 的“未登记候选”扫描（遍历共享内 reparse point）与 `POST /api/admin/hosts/refresh`（批量反查 DNS）属于便利功能，接口命名与触发时机在写该模块时定。
 - **回收站与上传清理的失败顺序**：NTFS 删除与 SQLite 事务无法真正同事务，顺序定为“先动文件、再动行”，并在下次扫描/恢复时遇到缺失文件则回收该行并报告跳过；真实事务边界由集成测试钉死。
 
 ## 平台约束
 
 - Windows 服务以 LocalSystem 运行：可读本机任意共享目录，也可写 db 所在目录；`install` 时若 exe 所在目录不可写直接报错并给出提示。
-- 端口来自 `settings.port`（默认 80）：可能被 IIS / 其他服务占用，启动失败必须输出"端口被占用 + 当前占用进程名"并退出，不允许静默；急救用 `land.exe config set port 8080`。
+- 端口来自 `settings.port`（默认 80）：可能被 IIS / 其他服务占用，启动失败必须输出"端口被占用 + 当前占用进程名"并退出，不允许静默；急救用 `lanDisk.exe config set port 8080`。
 - 无外网依赖：所有前端资源（含字体、WASM）随 exe 分发。
 
 ## 实现状态

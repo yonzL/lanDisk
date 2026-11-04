@@ -1,4 +1,5 @@
 # 构建产物
+/lanDisk.exe
 /land.exe
 /land.db
 land.db-wal

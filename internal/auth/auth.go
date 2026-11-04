@@ -59,7 +59,7 @@ func NewToken() string {
 
 // BootstrapAdmin creates the admin account on first start. The password is
 // random and never printed or written to disk: the operator obtains one with
-// `land.exe reset-password` (see architecture.md "启动顺序与引导").
+// `lanDisk.exe reset-password` (see architecture.md "启动顺序与引导").
 func BootstrapAdmin(ctx context.Context, st *store.Store) (bool, error) {
 	// Any existing account means this is not a first start: the operator may have
 	// renamed it, so checking for "admin" by name would create a second account.

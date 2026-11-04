@@ -25,13 +25,13 @@ var version = "dev"
 const usage = `lan disk — 局域网文件服务器
 
 用法:
-  land.exe [--db PATH]            前台运行（调试模式，日志打到控制台）
-  land.exe install                注册为 Windows 服务并开机自启（需管理员）
-  land.exe uninstall              停止并移除 Windows 服务（需管理员）
-  land.exe reset-password         生成并打印新的管理员口令（本机执行）
-  land.exe config get [KEY]       查看配置项（省略 KEY 则列出全部）
-  land.exe config set KEY VALUE   修改配置项（服务运行中修改需重启生效）
-  land.exe version                版本信息
+  lanDisk.exe [--db PATH]            前台运行（调试模式，日志打到控制台）
+  lanDisk.exe install                注册为 Windows 服务并开机自启（需管理员）
+  lanDisk.exe uninstall              停止并移除 Windows 服务（需管理员）
+  lanDisk.exe reset-password         生成并打印新的管理员口令（本机执行）
+  lanDisk.exe config get [KEY]       查看配置项（省略 KEY 则列出全部）
+  lanDisk.exe config set KEY VALUE   修改配置项（服务运行中修改需重启生效）
+  lanDisk.exe version                版本信息
 `
 
 func main() {
@@ -123,7 +123,7 @@ func serveResult(a *app.App) <-chan error {
 
 func cmdConfig(dbPath string, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("用法：land.exe config get|set …")
+		return fmt.Errorf("用法：lanDisk.exe config get|set …")
 	}
 	action, rest := args[0], args[1:]
 
@@ -164,7 +164,7 @@ func cmdConfig(dbPath string, args []string) error {
 		return nil
 	case "set":
 		if len(rest) != 2 {
-			return fmt.Errorf("用法：land.exe config set KEY VALUE")
+			return fmt.Errorf("用法：lanDisk.exe config set KEY VALUE")
 		}
 		key, value := rest[0], rest[1]
 		if !store.KnownSetting(key) {
@@ -176,12 +176,12 @@ func cmdConfig(dbPath string, args []string) error {
 		fmt.Printf("%s = %s\n（若服务正在运行，需重启服务生效）\n", key, value)
 		return nil
 	default:
-		return fmt.Errorf("用法：land.exe config get|set …")
+		return fmt.Errorf("用法：lanDisk.exe config get|set …")
 	}
 }
 
 // extractDB pulls the --db flag out of anywhere in the argument list, so both
-// `land.exe config set port 8080 --db d:\land.db` and `land.exe --db … config
+// `lanDisk.exe config set port 8080 --db d:\land.db` and `lanDisk.exe --db … config
 // set port 8080` work. A trailing --db with no value is an error: silently
 // falling back to the default database would write to the wrong file.
 func extractDB(args []string) (dbPath string, rest []string, err error) {

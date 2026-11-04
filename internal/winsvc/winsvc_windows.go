@@ -139,7 +139,7 @@ func Install() error {
 
 	if existing, err := m.OpenService(Name); err == nil {
 		existing.Close()
-		return fmt.Errorf("服务 %s 已安装，若要重装请先运行 land.exe uninstall", Name)
+		return fmt.Errorf("服务 %s 已安装，若要重装请先运行 lanDisk.exe uninstall", Name)
 	}
 
 	s, err := m.CreateService(Name, exe, mgr.Config{
@@ -158,10 +158,10 @@ func Install() error {
 	}
 
 	if err := s.Start(); err != nil {
-		return fmt.Errorf("服务已安装但启动失败（用 eventvwr.msc 查看原因，或运行 land.exe config set port 8080 换端口）：%w", err)
+		return fmt.Errorf("服务已安装但启动失败（用 eventvwr.msc 查看原因，或运行 lanDisk.exe config set port 8080 换端口）：%w", err)
 	}
 	fmt.Printf("已安装并启动服务 %q（%s）\n显示名：%s\n", Name, exe, DisplayName)
-	fmt.Println("访问地址：http://<本机局域网 IP>:<配置端口>（端口默认 80，可用 land.exe config get port 查看）")
+	fmt.Println("访问地址：http://<本机局域网 IP>:<配置端口>（端口默认 80，可用 lanDisk.exe config get port 查看）")
 	return nil
 }
 
@@ -223,7 +223,7 @@ func ensureWritable(dir string) error {
 	probe := filepath.Join(dir, ".land-write-test")
 	f, err := os.OpenFile(probe, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
-		return fmt.Errorf("程序目录 %s 不可写（land.db 需要放在这里）：%w\n请把 land.exe 放到可写目录（例如 D:\\land\\）后再安装", dir, err)
+		return fmt.Errorf("程序目录 %s 不可写（land.db 需要放在这里）：%w\n请把 lanDisk.exe 放到可写目录（例如 D:\\land\\）后再安装", dir, err)
 	}
 	f.Close()
 	os.Remove(probe)

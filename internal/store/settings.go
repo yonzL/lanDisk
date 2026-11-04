@@ -82,7 +82,7 @@ func (s *Store) SettingInt(ctx context.Context, key string, def int) (int, error
 	}
 	n, validateErr := validateInt(key, v)
 	if validateErr != nil {
-		return def, fmt.Errorf("配置项 %s 不合法，请用 land.exe config set %s <整数> 修正：%w", key, key, validateErr)
+		return def, fmt.Errorf("配置项 %s 不合法，请用 lanDisk.exe config set %s <整数> 修正：%w", key, key, validateErr)
 	}
 	return n, nil
 }
@@ -115,7 +115,7 @@ func validateInt(key, value string) (int, error) {
 	return n, nil
 }
 
-// SetSetting writes one setting. Both the admin API and `land.exe config set`
+// SetSetting writes one setting. Both the admin API and `lanDisk.exe config set`
 // funnel through here, so the two writers cannot drift apart.
 func (s *Store) SetSetting(ctx context.Context, key, value string) error {
 	if integerKeys[key] {
@@ -157,7 +157,7 @@ func (s *Store) Settings(ctx context.Context) (map[string]string, error) {
 }
 
 // KnownSetting reports whether key is one of the parameters this build owns;
-// it guards `land.exe config set` from inventing keys by typo.
+// it guards `lanDisk.exe config set` from inventing keys by typo.
 func KnownSetting(key string) bool {
 	_, ok := defaults[key]
 	return ok

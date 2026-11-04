@@ -51,7 +51,7 @@ async function submit() {
       <el-alert v-if="error" type="error" :closable="false" :title="error" show-icon style="margin-bottom: 12px" />
       <el-button type="primary" native-type="submit" :loading="busy" style="width: 100%">登录</el-button>
       <p class="land-muted" style="margin: 12px 0 0">
-        忘记口令或用户名？在服务器上运行 <code>land.exe reset-password</code> 重置。
+        忘记口令或用户名？在服务器上运行 <code>lanDisk.exe reset-password</code> 重置。
       </p>
     </el-form>
   </el-card>

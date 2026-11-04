@@ -18,7 +18,7 @@ const notBuiltPage = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>lan disk</title></head>
 <body style="font-family:'Microsoft YaHei',sans-serif;padding:40px">
 <h1>lan disk</h1>
-<p>前端产物未构建。运行 <code>bun install &amp;&amp; bun run build</code> 后重新编译 land.exe。</p>
+<p>前端产物未构建。运行 <code>bun install &amp;&amp; bun run build</code> 后重新编译 lanDisk.exe。</p>
 </body></html>`
 
 // FS returns the built frontend rooted at the dist directory.

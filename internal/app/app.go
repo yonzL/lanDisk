@@ -72,7 +72,7 @@ func New(dbPath, version string, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 	if created {
-		logger.Info("首次启动：已创建 admin 账号，运行 land.exe reset-password 获取口令")
+		logger.Info("首次启动：已创建 admin 账号，运行 lanDisk.exe reset-password 获取口令")
 	}
 
 	// One-time: old audit rows stored percent-encoded query strings; rewrite them
@@ -125,7 +125,7 @@ func New(dbPath, version string, logger *slog.Logger) (*App, error) {
 }
 
 // DefaultDBPath keeps every runtime artifact next to the executable: the data
-// directory holds only land.exe and land.db.
+// directory holds only lanDisk.exe and land.db.
 func DefaultDBPath() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -144,7 +144,7 @@ func (a *App) Addr() string { return a.addr }
 func (a *App) Start() error {
 	ln, err := net.Listen("tcp", a.addr)
 	if err != nil {
-		return fmt.Errorf("监听 %s 失败（端口可能被占用%s）：%w\n急救：land.exe config set %s 8080",
+		return fmt.Errorf("监听 %s 失败（端口可能被占用%s）：%w\n急救：lanDisk.exe config set %s 8080",
 			a.addr, PortOwnerHint(a.addr), err, store.KeyPort)
 	}
 	a.listen = ln

@@ -47,8 +47,8 @@ jobs:
         shell: pwsh
         run: |
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
-          go build -trimpath -ldflags "-s -w -X main.version=$version" -o land.exe ./cmd/land
-          ./land.exe version
+          go build -trimpath -ldflags "-s -w -X main.version=$version" -o lanDisk.exe ./cmd/land
+          ./lanDisk.exe version
 
       - name: Package release
         shell: pwsh
@@ -56,7 +56,7 @@ jobs:
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
           $dir = "lanDisk-$version"
           New-Item -ItemType Directory -Force -Path $dir | Out-Null
-          Copy-Item land.exe, README.md, THIRD-PARTY-NOTICES.md, LICENSE -Destination $dir
+          Copy-Item lanDisk.exe, README.md, THIRD-PARTY-NOTICES.md, LICENSE -Destination $dir
           Compress-Archive -Path $dir -DestinationPath "lanDisk-$version-windows-amd64.zip" -Force
           $hash = (Get-FileHash "lanDisk-$version-windows-amd64.zip" -Algorithm SHA256).Hash.ToLower()
           "$hash  lanDisk-$version-windows-amd64.zip" | Set-Content "lanDisk-$version-windows-amd64.zip.sha256" -NoNewline
