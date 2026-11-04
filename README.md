@@ -186,6 +186,19 @@ docs/                文档资源
 | 把自己锁在门外 | 本机 `127.0.0.1` 永远放行；从本机登录后台改 IP 规则 / 并发上限 |
 | 预览打不开 | 用 Chrome/Edge 近两个大版本；网络面板确认 `/file-viewer/` 下 Worker/WASM 为 200 |
 
+## 🙏 致谢
+
+本项目的功能面对标 [chfs / CuteHttpFileServer](http://iscute.cn/chfs)，预览能力来自 [FileViewer](https://github.com/flyfish-dev/file-viewer)。完整清单与许可见 **[THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md)**：
+
+| 类别 | 组件 |
+|---|---|
+| 后端 | Go 标准库、[modernc.org/sqlite](https://gitlab.com/cznic/sqlite)（CGO-free SQLite）、[golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto)（bcrypt）、[golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys)（Windows 服务） |
+| 前端 | [Vue 3](https://vuejs.org/)、[Vue Router](https://router.vuejs.org/)、[Vite](https://vite.dev/)、[TypeScript](https://www.typescriptlang.org/)、[Element Plus](https://element-plus.org/)、[Remix Icon](https://remixicon.com/) |
+| 预览 | [FileViewer](https://doc.file-viewer.app/)（Apache-2.0，含 PDF.js）、[libarchive](https://libarchive.org/) WASM（BSD-2-Clause）、[Comlink](https://github.com/GoogleChromeLabs/comlink) |
+| CAD / DWF | [@flyfish-dev/cad-viewer](https://www.npmjs.com/package/@flyfish-dev/cad-viewer)（**AGPL-3.0**，内含 GPL-3.0 的 LibreDWG 与 AGPL-3.0 的 dwf-viewer）、[shx-parser](https://www.npmjs.com/package/@mlightcad/shx-parser)、[dxf-parser](https://www.npmjs.com/package/dxf-parser) |
+
+> ⚠️ **许可证提示**：本项目自身代码是 **MIT**，但 CAD/DWF 预览链路依赖 **AGPL-3.0-only** 的 cad-viewer。**带 CAD 预览的构建产物在分发时受 AGPL-3.0 约束**（网络使用者有权获取对应源码）。若需要纯 MIT 分发，按上面的构建命令**去掉 `cad`、`model` 两个 renderer** 重新构建即可。
+
 ## 📝 许可证
 
-[MIT License](./LICENSE) © 2026 yonzL
+本项目代码以 [MIT License](./LICENSE) 发布 © 2026 yonzL；随包分发的第三方组件沿用各自许可，详见 [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md)。
