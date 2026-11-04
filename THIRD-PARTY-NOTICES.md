@@ -51,3 +51,17 @@ lan disk 自身代码以 [MIT](./LICENSE) 发布。本文件列出随项目一�
 - 感谢 [chfs / CuteHttpFileServer](http://iscute.cn/chfs)：本项目在功能面上把它当作对标基线（多共享目录、目录级权限、打包下载、访问日志、IP 过滤、限速）。
 - 感谢 [FileViewer](https://github.com/flyfish-dev/file-viewer) 把「浏览器里直接读 Office/CAD」这件事做成可自托管的组件，否则这个项目的预览能力只能靠服务端转码。
 - 感谢 [Vue](https://vuejs.org/)、[Element Plus](https://element-plus.org/)、[Remix Icon](https://remixicon.com/) 与 [modernc.org/sqlite](https://gitlab.com/cznic/sqlite)，它们让「一个 exe + 一个 db 文件」这种部署形态成立。
+
+## AGPL-3.0 合规说明（网络分发）
+
+lan disk 是通过网络提供服务的程序，因此按 AGPL-3.0 第 13 条，**使用带 CAD/DWF 预览的服务的人有权获得对应源代码**。对应源码的获取方式：
+
+| 组成部分 | 获取位置 |
+|---|---|
+| lan disk 自身（含嵌入 CAD 资源的构建脚本与资源清单） | 本仓库 <https://github.com/yonzL/lanDisk> |
+| `@flyfish-dev/cad-viewer`（0.8.3） | <https://github.com/flyfish-dev/file-viewer>（及其 npm 发布包内源码） |
+| `@mlightcad/libredwg-web` / LibreDWG | <https://github.com/mlightcad/libredwg-web>、<https://github.com/LibreDWG/libredwg> |
+| `dwf-viewer` | <https://www.npmjs.com/package/dwf-viewer>（发布包内源码） |
+| `@file-viewer/*`（Apache-2.0） | <https://github.com/flyfish-dev/file-viewer> |
+
+如果你的部署只供内部使用、或你已按上文改为不带 CAD 的构建，则不受此条约束。

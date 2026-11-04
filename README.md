@@ -199,6 +199,8 @@ docs/                文档资源
 
 > ⚠️ **许可证提示**：本项目自身代码是 **MIT**，但 CAD/DWF 预览链路依赖 **AGPL-3.0-only** 的 cad-viewer。**带 CAD 预览的构建产物在分发时受 AGPL-3.0 约束**（网络使用者有权获取对应源码）。若需要纯 MIT 分发，按上面的构建命令**去掉 `cad`、`model` 两个 renderer** 重新构建即可。
 
-## 📝 许可证
+
+> **AGPL 对应源码**：带 CAD 预览的构建在提供网络服务时，使用者可向 <https://github.com/yonzL/lanDisk> 与 [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md#agpl-30-合规说明网络分发) 列出的上游仓库获取完整对应源码。
 
 本项目代码以 [MIT License](./LICENSE) 发布 © 2026 yonzL；随包分发的第三方组件沿用各自许可，详见 [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md)。
+
