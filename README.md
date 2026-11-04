@@ -139,6 +139,20 @@ go build -trimpath -ldflags "-s -w -X main.version=1.0.0" -o land.exe ./cmd/land
 >
 > 预览资源只复制实际用到的 renderer（51 MB）；全量是 191 MB。`web/public/file-viewer/` 不进仓库，按上面第二条命令生成。
 
+
+### 发布（维护者）
+
+发布由 GitHub Actions 在 **tag** 上自动完成（`.github/workflows/release.yml`）：
+
+```bash
+# 1. 先把本次发布说明放到 docs/release/vX.Y.Z.md（会作为 release body）
+# 2. 打 tag 并推送，CI 会构建 Windows 二进制、复制预览资源、跑测试并发布
+git tag -a v1.0.0 -m "lan disk 1.0.0"
+git push origin v1.0.0
+```
+
+产物：`lanDisk-<version>-windows-amd64.zip`（含 exe + README + 第三方许可）与同名 `.sha256`。
+
 ## 🧱 技术栈
 
 | 层 | 选择 | 说明 |
