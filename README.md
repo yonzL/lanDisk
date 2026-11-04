@@ -19,7 +19,7 @@
 功能面对标 [chfs](http://iscute.cn/chfs)（多共享目录、目录级写权限、上传、打包下载、访问日志、IP 过滤、限速），补上 chfs 最弱的一环：**文件点开就能看**，而不是只能下载到本地。
 
 > **一个 69 MB 的 exe，就是全部。**
-> 不用装数据库、不用装 .NET、不用装 LibreOffice、不用联外网——共享文件和 `land.db` 放在同一个文件夹里，拷走就能换机器。
+> 不用装数据库、不用装 .NET、不用装 LibreOffice、不用联外网——共享文件和 `landisk.db` 放在同一个文件夹里，拷走就能换机器。
 
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2B-lightgrey)
@@ -36,7 +36,7 @@
 | **服务端转码** | — | 云端转码 | **零转码，Worker/WASM 全在同源静态资源里** |
 | **离线可用** | 是 | 否 | **是，全部前端资源内嵌进 exe** |
 | **权限模型** | 多账号 + 目录规则 | 账号体系 | **单管理员 + 匿名只读 / 可写目录，写操作全量可追溯** |
-| **数据形态** | ini 配置 + 日志文件 | 云端 | **运行期只有 `lanDisk.exe` + `land.db`** |
+| **数据形态** | ini 配置 + 日志文件 | 云端 | **运行期只有 `lanDisk.exe` + `landisk.db`** |
 | **回收站** | 有 | 有 | **有（按共享分仓，可恢复，保留期可配）** |
 | **审计** | 有日志文件 | 有限 | **全量操作日志 + 按时间/IP/操作筛选 + CSV 导出 + IP→主机名映射** |
 
@@ -70,7 +70,7 @@
 ### 🪶 部署简单到不像话
 
 - **Windows 服务**：`lanDisk.exe install` 注册 + 开机自启；`uninstall` 干净移除（不碰共享文件与数据库）
-- **运行期只有两个文件**：`lanDisk.exe` 与 `land.db`（配置、账号、会话、备注、日志、回收站元数据全在里面）
+- **运行期只有两个文件**：`lanDisk.exe` 与 `landisk.db`（配置、账号、会话、备注、日志、回收站元数据全在里面）
 - **免配置启动**：首启自动建管理员，口令用 `lanDisk.exe reset-password` 现取（不落任何口令文件）
 - **登录长期有效**：关掉浏览器、隔天再来都不用重登，只有手动「退出登录」才失效
 
@@ -79,7 +79,7 @@
 ### 环境要求
 
 - Windows 10 / 11（服务模式需要管理员权限）
-- 一个**可写目录**放 exe（例如 `D:\land\`，不要放 `Program Files`——`land.db` 就在它旁边）
+- 一个**可写目录**放 exe（例如 `D:\land\`，不要放 `Program Files`——`landisk.db` 就在它旁边）
 
 ### 部署三步
 
@@ -105,7 +105,7 @@ lanDisk.exe config set port 8080     # 换端口，重启服务生效
 lanDisk.exe                       # 前台调试运行（日志打到控制台，不注册服务）
 lanDisk.exe install / uninstall   # 注册 / 移除 Windows 服务
 lanDisk.exe reset-password        # 生成并打印新的管理员口令
-lanDisk.exe config get|set KEY V  # 查看 / 修改配置（写进 land.db）
+lanDisk.exe config get|set KEY V  # 查看 / 修改配置（写进 landisk.db）
 lanDisk.exe version               # 版本
 ```
 
@@ -113,11 +113,11 @@ lanDisk.exe version               # 版本
 
 | 路径 | 内容 |
 |---|---|
-| `land.db` | 配置、共享、权限规则、备注、账号、会话、上传会话、回收站元数据、日志、IP 规则、主机名 |
+| `landisk.db` | 配置、共享、权限规则、备注、账号、会话、上传会话、回收站元数据、日志、IP 规则、主机名 |
 | `<共享根>/.land-trash/` | 该共享的回收站 |
 | `<共享根>/<文件名>.landpart-<id>` | 上传中的分块（完成或过期自动消失） |
 
-备份 = 停服务后拷贝 `land.db`（以及需要保留的共享目录）；升级 = 换 `lanDisk.exe`，数据库首次启动自动迁移。
+备份 = 停服务后拷贝 `landisk.db`（以及需要保留的共享目录）；升级 = 换 `lanDisk.exe`，数据库首次启动自动迁移。
 
 ## 🛠️ 从源码构建
 

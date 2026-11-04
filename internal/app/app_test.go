@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -172,5 +173,51 @@ func TestShutdownReportsDrainedTimeout(t *testing.T) {
 	defer cancel()
 	if err := a.Shutdown(ctx); err == nil {
 		t.Fatal("Shutdown returned nil while a handler was still running past the deadline")
+	}
+}
+
+func TestEnsureDBFileNameMigratesLegacyDatabase(t *testing.T) {
+	dir := t.TempDir()
+	legacy := filepath.Join(dir, "land.db")
+	if err := os.WriteFile(legacy, []byte("old-data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy+"-wal", []byte("wal"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := ensureDBFileName(dir)
+	if filepath.Base(got) != DBFileName {
+		t.Fatalf("path = %q, want %s", got, DBFileName)
+	}
+	body, err := os.ReadFile(got)
+	if err != nil || string(body) != "old-data" {
+		t.Fatalf("migrated db = %q (%v)", body, err)
+	}
+	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
+		t.Fatal("legacy file still present after migration")
+	}
+	if _, err := os.Stat(got + "-wal"); err != nil {
+		t.Fatalf("wal side file not migrated: %v", err)
+	}
+
+	// A second call is a no-op and keeps the new file.
+	if again := ensureDBFileName(dir); again != got {
+		t.Fatalf("second call = %q, want %q", again, got)
+	}
+}
+
+func TestEnsureDBFileNamePrefersExistingNewFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "land.db"), []byte("legacy"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, DBFileName), []byte("current"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := ensureDBFileName(dir)
+	body, _ := os.ReadFile(got)
+	if string(body) != "current" {
+		t.Fatalf("picked up the legacy file over the existing new one: %q", body)
 	}
 }

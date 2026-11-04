@@ -17,7 +17,7 @@ tags: [go, vue3, sqlite, embed]
                     ┌──────────────── lanDisk.exe (LocalSystem) ────────────────┐
 浏览器 ── HTTP ──▶  │ 中间件链 ─▶ httpapi ─▶ files / upload / trash / admin  │
 (匿名 / admin)      │              │              │                          │
-                    │              └──▶ store (SQLite: land.db)              │
+                    │              └──▶ store (SQLite: landisk.db)              │
                     │  go:embed: web/dist + FileViewer 资源                  │
                     └───────────────────────────┬────────────────────────────┘
                                                 │
@@ -28,12 +28,12 @@ tags: [go, vue3, sqlite, embed]
 
 ## 运行期文件
 
-**程序目录里运行期只有两个文件：`lanDisk.exe` 与 `land.db`。** 没有 `config.json`、没有口令文件、没有 temp 目录、没有日志副本。
+**程序目录里运行期只有两个文件：`lanDisk.exe` 与 `landisk.db`。** 没有 `config.json`、没有口令文件、没有 temp 目录、没有日志副本。
 
 | 位置 | 文件 | 说明 |
 |---|---|---|
 | exe 同级 | `lanDisk.exe` | 程序本体（内嵌前端与预览资源） |
-| exe 同级 | `land.db` | **唯一真源**：配置、共享、规则、备注、账号、会话、上传会话、回收站元数据、日志、IP 规则、主机名映射，全部在这里 |
+| exe 同级 | `landisk.db` | **唯一真源**：配置、共享、规则、备注、账号、会话、上传会话、回收站元数据、日志、IP 规则、主机名映射，全部在这里 |
 | 共享根内 | `<共享根>/.land-trash/` | 该共享的回收站（必须在同一卷才 `rename` 得动） |
 | 共享根内 | `<目标名>.landpart-<uploadID>` · `<目标名>.landrestore-<id>` | 上传分块与跨卷恢复临时文件，写完即改名，列表与搜索中不可见 |
 
@@ -45,7 +45,7 @@ tags: [go, vue3, sqlite, embed]
 
 没有配置文件，于是启动顺序是固定的：
 
-1. 定位 db（默认 exe 同级 `land.db`，`--db` 可覆盖，用于多实例调试）。
+1. 定位 db（默认 exe 同级 `landisk.db`，`--db` 可覆盖，用于多实例调试）。
 2. 打开 SQLite（WAL + `busy_timeout`），执行迁移，缺省 `settings` 行补齐。
 3. 从 `settings.port` 读监听端口（默认 80）。
 
@@ -67,7 +67,7 @@ tags: [go, vue3, sqlite, embed]
 |---|---|---|
 | `cmd/land` | 子命令：前台运行、install/uninstall、reset-password、config、version | 只做参数解析与装配 |
 | `internal/app` | 运行期装配与生命周期：开库 → 读端口 → 起停 HTTP | 控制台与服务模式唯一的共用入口，两条路径不得各自搭一套启动/关闭 |
-| `internal/store` | `land.db` 打开、迁移、类型化查询（shares/mounts/rules/notes/users/sessions/uploads/trash/logs/ip_rules/hosts/settings） | 唯一会碰 SQL 的包；对外只暴露结构体与仓储方法 |
+| `internal/store` | `landisk.db` 打开、迁移、类型化查询（shares/mounts/rules/notes/users/sessions/uploads/trash/logs/ip_rules/hosts/settings） | 唯一会碰 SQL 的包；对外只暴露结构体与仓储方法 |
 | `internal/auth` | 口令哈希、会话签发与校验、登录失败节流 | 依赖 store，不依赖 httpapi |
 | `internal/perms` | 规则解析与判定：共享可见性、路径可读/可写、`.land-trash`/`.landpart` 屏蔽 | 只回答"能不能"，不碰文件系统也不写 SQL；`files`/`upload`/`trash` 共用同一判定结果类型 |
 | `internal/files` | 虚拟路径 ↔ 磁盘路径解析（含挂载点展开）、目录列表、备注、下载、zip、写操作 | 不写 SQL；权限判定一律调 `perms`，副作用（日志）经事件回调 |
@@ -146,7 +146,7 @@ tags: [go, vue3, sqlite, embed]
 
 绕过 `Resolve` 直接拼路径视为缺陷，不靠 code review 兜底——这条规则写在包注释里，并作为 `files` 包的测试基线。
 
-## 存储模型（land.db）
+## 存储模型（landisk.db）
 
 ```sql
 settings(key TEXT PRIMARY KEY, value TEXT)

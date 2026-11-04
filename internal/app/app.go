@@ -124,8 +124,16 @@ func New(dbPath, version string, logger *slog.Logger) (*App, error) {
 	}, nil
 }
 
+// Database filename next to the executable. 1.0.2 renamed it from land.db to
+// landisk.db so the data file matches the product name; the old file is migrated
+// in place on first start.
+const (
+	DBFileName       = "landisk.db"
+	legacyDBFileName = "land.db"
+)
+
 // DefaultDBPath keeps every runtime artifact next to the executable: the data
-// directory holds only lanDisk.exe and land.db.
+// directory holds only lanDisk.exe and landisk.db.
 func DefaultDBPath() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -134,7 +142,30 @@ func DefaultDBPath() (string, error) {
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
 	}
-	return filepath.Join(filepath.Dir(exe), "land.db"), nil
+	dir := filepath.Dir(exe)
+	return ensureDBFileName(dir), nil
+}
+
+// ensureDBFileName returns <dir>/landisk.db, renaming a legacy land.db (and its
+// WAL/SHM side files) when the new name does not exist yet. Upgrading is then a
+// matter of replacing the exe: the data follows the name change automatically.
+func ensureDBFileName(dir string) string {
+	current := filepath.Join(dir, DBFileName)
+	if _, err := os.Stat(current); err == nil {
+		return current
+	}
+	legacy := filepath.Join(dir, legacyDBFileName)
+	if _, err := os.Stat(legacy); err != nil {
+		return current // neither exists: a fresh database will be created
+	}
+	// Rename the database first; the side files only matter if the rename worked.
+	if err := os.Rename(legacy, current); err != nil {
+		return legacy
+	}
+	for _, suffix := range []string{"-wal", "-shm"} {
+		_ = os.Rename(legacy+suffix, current+suffix)
+	}
+	return current
 }
 
 // Addr is the address the app listens on.

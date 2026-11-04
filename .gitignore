@@ -1,9 +1,11 @@
 # 构建产物
 /lanDisk.exe
 /land.exe
+/landisk.db
 /land.db
+landisk.db-wal
+landisk.db-shm
 land.db-wal
-land.db-shm
 
 # 前端
 node_modules/
