@@ -1,0 +1,74 @@
+name: release
+
+# Tag-driven release: pushing vX.Y.Z builds the Windows binary with the self-hosted
+# preview assets, packages it with the license/notices, and publishes a GitHub
+# release whose notes live in docs/release/<tag>.md.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      - name: Copy self-hosted preview assets
+        working-directory: web
+        run: >
+          bunx --no-install file-viewer-copy-assets ./public/file-viewer
+          --renderers office-word-openxml,spreadsheet-openxml,office-presentation,pdf,archive,cad,model
+
+      - name: Build frontend
+        working-directory: web
+        run: bun run build
+
+      - name: Test backend
+        run: go test ./...
+
+      - name: Build binary
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          go build -trimpath -ldflags "-s -w -X main.version=$version" -o land.exe ./cmd/land
+          ./land.exe version
+
+      - name: Package release
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $dir = "lanDisk-$version"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Copy-Item land.exe, README.md, THIRD-PARTY-NOTICES.md, LICENSE -Destination $dir
+          Compress-Archive -Path $dir -DestinationPath "lanDisk-$version-windows-amd64.zip" -Force
+          $hash = (Get-FileHash "lanDisk-$version-windows-amd64.zip" -Algorithm SHA256).Hash.ToLower()
+          "$hash  lanDisk-$version-windows-amd64.zip" | Set-Content "lanDisk-$version-windows-amd64.zip.sha256" -NoNewline
+          Get-Content "lanDisk-$version-windows-amd64.zip.sha256"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: lan disk ${{ github.ref_name }}
+          body_path: docs/release/${{ github.ref_name }}.md
+          files: |
+            lanDisk-*-windows-amd64.zip
+            lanDisk-*-windows-amd64.zip.sha256
+          draft: false
+          prerelease: false
