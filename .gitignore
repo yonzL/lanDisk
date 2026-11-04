@@ -1,0 +1,16 @@
+# 构建产物
+/land.exe
+/land.db
+land.db-wal
+land.db-shm
+
+# 前端
+node_modules/
+web/dist/*
+!web/dist/.gitkeep
+
+# 预览资源（51 MB，按 README 的 copy-assets 命令生成）
+web/public/file-viewer/
+
+# 本地任务/会话上下文
+.thinkrail/context/

@@ -1,0 +1,29 @@
+{
+  "name": "land-web",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && bun scripts/keep-dist.ts",
+    "typecheck": "vue-tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@file-viewer/preset-engineering": "^3.3.3",
+    "@file-viewer/preset-standard": "^3.3.3",
+    "@file-viewer/web": "^3.3.3",
+    "@file-viewer/web-full": "^3.3.3",
+    "element-plus": "^2.9.0",
+    "remixicon": "^4.9.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vue-tsc": "^2.2.0"
+  }
+}
