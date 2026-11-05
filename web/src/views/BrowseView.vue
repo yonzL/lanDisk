@@ -460,6 +460,16 @@ watch([currentPath, isRoot], () => {
   clearSearch()
   void load()
 })
+// Logging in or out changes what the server lets us see (write buttons, the
+// admin-only actions, hidden shares), so the listing must be re-fetched rather
+// than left showing the previous visitor's view.
+watch(
+  () => session.authenticated,
+  () => {
+    clearSearch()
+    void load()
+  },
+)
 onMounted(async () => {
   // The footer shows the running build so a deployment can be identified at a
   // glance; a failure here just leaves it blank.

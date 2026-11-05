@@ -205,6 +205,7 @@ logs(id INTEGER PK, ts INT, ip TEXT, host TEXT, action TEXT, share_id INT, path 
   - 预览页在**新标签页**打开（`window.open` + 清空 opener，被拦截时同页回退），走 `land-main--full` 全宽布局，页面内提供「全屏」（Fullscreen API）与下载。
   - 图标统一用 Remix Icon（随包自托管，无 CDN）。
 - 状态：轻量 composable + `fetch` 封装，不引入重状态库。
+- 状态与刷新：登录/退出后 `session` 是响应式的（页头、管理员菜单、按钮即时变化），浏览页 `watch(session.authenticated)` 会重新拉取目录——因为可写目录、备注入口、隐藏共享都是**服务端按访问者算的**，只靠前端状态会让页面停留在上一个身份的数据上。
 
 ## 构建与打包
 
@@ -237,7 +238,7 @@ go build -trimpath -ldflags "-s -w -X main.version=..."  → lanDisk.exe
 | 领域 | 状态 |
 |---|---|
 | 部署形态 | 单 exe、`install`/`uninstall` 注册 Windows 服务（未提权时明确报错）、`reset-password`、`config get/set` |
-| 账号与会话 | 首启建 admin（随机口令不落盘）、登录名为“用户名 + 口令”（用户名可在改口令页一并改名，默认 admin）、登录节流、**登录长期有效直到手动退出**（持久 cookie，服务端不按空闲时间清会话）、改凭据即踢所有会话、`must_change` 服务端强制 |
+| 账号与会话 | 首启建 admin（随机口令不落盘）、登录名“用户名 + 口令”（用户名可在改口令页一并改名，默认 admin）、登录节流、**登录长期有效直到手动退出**（持久 cookie，服务端不按空闲时间清会话）、**首次登录设置新口令时免输当前口令**（会话刚由该口令建立）、改凭据即踢所有会话、`must_change` 服务端强制 |
 | 共享与权限 | 多共享 + 虚拟路径、`share_rules` 前缀覆盖、deny-by-default、大小写折叠、匿名仅读 + 可写目录内上传/建目录 |
 | 浏览 | 固定列序（名称/备注/操作/大小/修改时间）、按比例自适应列宽、单列排序、分页、隐藏保留名；工具栏 + 面包屑 + 行末图标按钮 + 页脚（对齐 chfs 参考图） |
 | 目录选择 | 弹窗浏览服务端整机（盘符 → 目录，仅目录，可内建文件夹）用于新建共享；同一组件用共享内模式选移动目标 |

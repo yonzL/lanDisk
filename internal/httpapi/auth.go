@@ -155,7 +155,10 @@ func (s *Server) handlePassword() http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "internal", "内部错误")
 			return
 		}
-		if !auth.CheckPassword(user.PassHash, req.Current) {
+		// Right after the first login (or after `reset-password`) the session was
+		// just established with the temporary password, so asking for it again is
+		// pure friction. Every later change still requires the current password.
+		if !sess.MustChange && !auth.CheckPassword(user.PassHash, req.Current) {
 			writeError(w, http.StatusUnauthorized, "invalid_credentials", "当前口令不正确")
 			return
 		}

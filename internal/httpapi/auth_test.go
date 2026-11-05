@@ -326,3 +326,34 @@ func TestRenameRejectsBadUsername(t *testing.T) {
 		}
 	}
 }
+
+func TestMustChangeSkipsCurrentPassword(t *testing.T) {
+	srv, password := newAuthServer(t, "correct-horse") // created with must_change=1
+	h := srv.Handler()
+
+	login := postJSON(t, h, "/api/login", `{"username":"admin","password":"`+password+`"}`)
+	cookie := login.Result().Cookies()[0]
+
+	// First login: the session was just created with this password, so the new
+	// password can be set without repeating it.
+	req := httptest.NewRequest(http.MethodPost, "/api/password",
+		strings.NewReader(`{"new_password":"a-very-long-one"}`))
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first-login password set = %d %s", rec.Code, rec.Body)
+	}
+
+	// After that, a credential change requires the current password again.
+	login = postJSON(t, h, "/api/login", `{"username":"admin","password":"a-very-long-one"}`)
+	cookie = login.Result().Cookies()[0]
+	req = httptest.NewRequest(http.MethodPost, "/api/password",
+		strings.NewReader(`{"new_password":"another-long-one"}`))
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("password change without current = %d, want 401", rec.Code)
+	}
+}
