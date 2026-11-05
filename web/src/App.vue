@@ -7,7 +7,7 @@ import { SESSION_EXPIRED_EVENT, ensureSession, logout, session } from './session
 
 const router = useRouter()
 const route = useRoute()
-const site = ref<Site>({ title: 'lan disk', notice: '' })
+const site = ref<Site>({ title: 'lan disk', notice: '', version: '' })
 
 onMounted(async () => {
   // A failed probe just means "not logged in"; the pages handle that state.

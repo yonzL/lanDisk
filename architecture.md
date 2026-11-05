@@ -193,7 +193,8 @@ logs(id INTEGER PK, ts INT, ip TEXT, host TEXT, action TEXT, share_id INT, path 
 
 单 SPA，两个面：**浏览面**（匿名可用）与**管理面**（需 admin）。
 
-- 路由：`/s/:share/*path` 浏览、`/s/:share/preview/*path` 预览（懒加载预览链路）、`/login`、`/admin/*`。
+- 路由：`/` 虚拟根（把共享目录当文件夹列出来，没有独立首页）、`/s/:share/*path` 共享内浏览、`/s/:share/preview/*path` 预览（懒加载预览链路）、`/login`、`/admin/*`。
+- 面包屑从虚拟根开始（根目录 / 共享名 / 子目录…），共享名本身可点回到该共享根，根目录可点回到 `/`。
 - 技术：Vue 3 + TypeScript + Vite + Element Plus（表单/表格/弹窗直接拿现成件）；文件列表列序固定（文件名 / 备注 / 操作 / 大小 / 修改时间），列宽用 `min-width` 比例自适应；列拖拽重排已移除（此前实现不可靠），每页条数仍存 `localStorage`。
 - 浏览面视觉对齐 chfs 参考：工具栏（上传文件 / 上传目录 / 新建目录 / 页内搜索 / 打包下载）+ 灰色面包屑条 + 行末图标按钮（预览/下载/重命名/移动/删除）+ 页脚版本行；表头点按排序保留。
 - 目录选择：`components/DirPickerDialog.vue` 一套组件两种模式——`machine`（调 `/api/admin/fs/*`，整机盘符 → 目录，仅 admin）用于新建共享；`share`（复用 `/api/shares/{id}/list`）用于移动目标，范围锁在当前共享。

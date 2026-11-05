@@ -19,6 +19,9 @@ func (s *Server) handleSite() http.HandlerFunc {
 		writeJSON(w, http.StatusOK, map[string]string{
 			"title":  get(store.KeySiteTitle),
 			"notice": get(store.KeySiteNotice),
+			// The footer shows the running build, which is the only place a
+			// deployment can be told apart from the last one.
+			"version": s.Version,
 		})
 	}
 }

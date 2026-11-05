@@ -285,7 +285,7 @@ export const logsApi = {
 export interface Site {
   title: string
   notice: string
-
+  version: string
 }
 
 export const siteApi = {

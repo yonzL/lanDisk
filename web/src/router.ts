@@ -1,15 +1,16 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { ensureSession, session } from './session'
 
-// Client routes. Everything that is not /api or a built asset falls through to
-// this router, so the server only ever serves index.html for these paths.
+// Client routes. The virtual root ("/") lists every shared directory as a folder;
+// inside a share the same view lists files and subdirectories, so there is no
+// separate landing page to keep in sync.
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: () => import('./views/HomeView.vue'),
+      name: 'root',
+      component: () => import('./views/BrowseView.vue'),
     },
     {
       path: '/login',
@@ -17,15 +18,15 @@ export const router = createRouter({
       component: () => import('./views/LoginView.vue'),
     },
     {
-      path: '/admin/settings',
-      name: 'settings',
-      component: () => import('./views/SettingsView.vue'),
-      meta: { requiresAdmin: true },
-    },
-    {
       path: '/admin/logs',
       name: 'logs',
       component: () => import('./views/LogsView.vue'),
+      meta: { requiresAdmin: true },
+    },
+    {
+      path: '/admin/settings',
+      name: 'settings',
+      component: () => import('./views/SettingsView.vue'),
       meta: { requiresAdmin: true },
     },
     {

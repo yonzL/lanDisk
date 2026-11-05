@@ -8,9 +8,12 @@ import {
   notesApi,
   opsApi,
   searchApi,
+  siteApi,
   trashApi,
   type Entry,
+  sharesApi,
   type ListResponse,
+  type PublicShare,
   type SearchResponse,
 } from '../api'
 import { uploadFile, type UploadProgress } from '../upload'
@@ -25,6 +28,11 @@ type SortKey = 'name' | 'size' | 'mod_time'
 
 const route = useRoute()
 const router = useRouter()
+
+// The virtual root: every shared directory is a folder here, so "/" is the only
+// home the product needs. Inside a share the same view lists files.
+const isRoot = computed(() => route.name === 'root')
+const shares = ref<PublicShare[]>([])
 
 const shareId = computed(() => Number(route.params.id))
 const currentPath = computed(() => {
@@ -48,6 +56,7 @@ const pageSize = ref(loadPageSize())
 const sort = ref<string>('name')
 const order = ref<'asc' | 'desc'>('asc')
 const pickerVisible = ref(false)
+const siteVersion = ref('')
 
 function loadPageSize(): number {
   const raw = Number(localStorage.getItem('land.pageSize'))
@@ -60,10 +69,16 @@ function savePageSize(size: number) {
 
 
 async function load() {
-  if (!Number.isFinite(shareId.value) || shareId.value <= 0) return
   loading.value = true
   error.value = ''
   try {
+    if (isRoot.value) {
+      shares.value = await sharesApi.public()
+      listing.value = null
+      return
+    }
+    if (!Number.isFinite(shareId.value) || shareId.value <= 0) return
+    shares.value = []
     listing.value = await listApi.list(shareId.value, {
       path: currentPath.value,
       page: page.value,
@@ -73,6 +88,7 @@ async function load() {
     })
   } catch (e) {
     listing.value = null
+    shares.value = []
     error.value = e instanceof ApiError ? (e.status === 404 ? '目录不存在或无权访问' : e.message) : '加载失败'
   } finally {
     loading.value = false
@@ -412,62 +428,89 @@ function fileIcon(entry: Entry) {
 
 const rows = computed(() => (searchResult.value ? searchResult.value.entries : (listing.value?.entries ?? [])))
 const writable = computed(() => listing.value?.writable ?? false)
+const shareName = computed(() => listing.value?.share.name ?? '')
 
-watch(currentPath, () => {
+function openShare(share: PublicShare) {
+  void router.push(`/s/${share.id}`)
+}
+
+function downloadShareZip(share: PublicShare) {
+  window.location.href = `/api/shares/${share.id}/zip?path=`
+}
+
+watch([currentPath, isRoot], () => {
   page.value = 1
   clearSearch()
   void load()
 })
-onMounted(load)
+onMounted(async () => {
+  // The footer shows the running build so a deployment can be identified at a
+  // glance; a failure here just leaves it blank.
+  try {
+    siteVersion.value = (await siteApi.get()).version
+  } catch {
+    // ignore: the listing is the primary content
+  }
+  await load()
+})
 </script>
 
 <template>
   <el-card shadow="never" class="land-list-card">
     <div class="land-toolbar">
-      <el-button v-if="writable" size="small" @click="pickFiles">
-        <i class="ri-upload-cloud-2-line" /> 上传文件
-      </el-button>
-      <el-button v-if="writable" size="small" @click="pickDirectory">
-        <i class="ri-folder-upload-line" /> 上传目录
-      </el-button>
-      <el-button v-if="writable" size="small" @click="openMkdir">
-        <i class="ri-folder-add-line" /> 新建目录
-      </el-button>
-      <input ref="fileInput" type="file" multiple hidden @change="onFilesPicked" />
-      <input ref="dirInput" type="file" webkitdirectory hidden @change="onDirectoryPicked" />
+      <!-- The virtual root only lists shares; upload/mkdir/search need a real
+           directory, so those controls appear once you are inside a share. -->
+      <template v-if="!isRoot">
+        <el-button v-if="writable" size="small" @click="pickFiles">
+          <i class="ri-upload-cloud-2-line" /> 上传文件
+        </el-button>
+        <el-button v-if="writable" size="small" @click="pickDirectory">
+          <i class="ri-folder-upload-line" /> 上传目录
+        </el-button>
+        <el-button v-if="writable" size="small" @click="openMkdir">
+          <i class="ri-folder-add-line" /> 新建目录
+        </el-button>
+        <input ref="fileInput" type="file" multiple hidden @change="onFilesPicked" />
+        <input ref="dirInput" type="file" webkitdirectory hidden @change="onDirectoryPicked" />
 
-      <div class="land-toolbar__search">
-        <el-input
-          v-model="searchQuery"
-          size="small"
-          placeholder="在当前页面中搜索…"
-          clearable
-          @keyup.enter="runSearch"
-          @clear="clearSearch"
-        >
-          <template #append>
-            <el-button :loading="searching" @click="runSearch">搜索</el-button>
-          </template>
-        </el-input>
-      </div>
+        <div class="land-toolbar__search">
+          <el-input
+            v-model="searchQuery"
+            size="small"
+            placeholder="在当前页面中搜索…"
+            clearable
+            @keyup.enter="runSearch"
+            @clear="clearSearch"
+          >
+            <template #append>
+              <el-button :loading="searching" @click="runSearch">搜索</el-button>
+            </template>
+          </el-input>
+        </div>
+      </template>
 
       <div style="flex: 1" />
       <el-button text size="small" :loading="loading" @click="load">
         <i class="ri-refresh-line" /> 刷新
       </el-button>
-      <el-button text size="small" @click="downloadZip">
+      <el-button v-if="!isRoot" text size="small" @click="downloadZip">
         <i class="ri-file-zip-line" /> 打包下载
       </el-button>
     </div>
 
     <div class="land-breadcrumb">
-      <span class="land-breadcrumb__root" @click="goTo('')">{{ listing?.share.name ?? '共享' }}</span>
-      <template v-for="crumb in breadcrumbs" :key="crumb.path">
+      <span v-if="isRoot" class="land-breadcrumb__current">根目录</span>
+      <template v-else>
+        <!-- The virtual root is the top of the tree, so a share is never the
+             first crumb: users need a way back to "/" from inside a share. -->
+        <a class="land-breadcrumb__link" @click="router.push('/')">根目录</a>
         <span class="land-breadcrumb__sep">/</span>
-        <a class="land-breadcrumb__link" @click="goTo(crumb.path)">{{ crumb.name }}</a>
+        <a class="land-breadcrumb__link" @click="goTo('')">{{ shareName || '共享' }}</a>
+        <template v-for="crumb in breadcrumbs" :key="crumb.path">
+          <span class="land-breadcrumb__sep">/</span>
+          <a class="land-breadcrumb__link" @click="goTo(crumb.path)">{{ crumb.name }}</a>
+        </template>
       </template>
-      <span v-if="!breadcrumbs.length" class="land-breadcrumb__sep">/</span>
-      <span v-if="!breadcrumbs.length" class="land-breadcrumb__current">根目录</span>
     </div>
 
     <el-alert v-if="error" type="error" :closable="false" :title="error" show-icon />
@@ -497,7 +540,43 @@ onMounted(load)
       </div>
     </div>
 
+    <!-- Virtual root: each shared directory is a folder row. -->
     <el-table
+      v-if="isRoot"
+      :data="shares"
+      v-loading="loading"
+      empty-text="还没有共享目录"
+      class="land-filetable"
+      @row-dblclick="openShare"
+    >
+      <el-table-column label="文件夹" min-width="260">
+        <template #default="{ row }">
+          <i class="land-fileicon ri-folder-3-fill land-icon--folder" />
+          <a class="land-file-link" @click="openShare(row)">{{ row.name }}</a>
+        </template>
+      </el-table-column>
+      <el-table-column label="挂载路径" min-width="260">
+        <template #default="{ row }"><span class="land-muted">{{ row.virtual_path }}</span></template>
+      </el-table-column>
+      <el-table-column label="操作" min-width="240" align="right">
+        <template #default="{ row }">
+          <el-button class="land-act land-act--view" size="small" title="打开" @click="openShare(row)">
+            <i class="ri-folder-open-line" />
+          </el-button>
+          <el-button
+            class="land-act land-act--download"
+            size="small"
+            title="打包下载整个共享"
+            @click="downloadShareZip(row)"
+          >
+            <i class="ri-file-zip-line" />
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-table
+      v-else
       :data="rows"
       v-loading="loading || searching"
       :empty-text="searchResult ? '没有匹配的文件名' : '这个目录是空的'"
@@ -606,7 +685,7 @@ onMounted(load)
     </el-table>
 
     <el-pagination
-      v-if="!searchResult && (listing?.total ?? 0) > pageSize"
+      v-if="!isRoot && !searchResult && (listing?.total ?? 0) > pageSize"
       style="margin-top: 16px; justify-content: flex-end"
       layout="total, prev, pager, next, sizes"
       :total="listing?.total ?? 0"
@@ -618,7 +697,7 @@ onMounted(load)
     />
 
     <div class="land-footer">
-      <span>lan disk · v1.0.0</span>
+      <span>lan disk · {{ siteVersion }}</span>
       <span>简体中文</span>
     </div>
   </el-card>
