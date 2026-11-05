@@ -5,22 +5,53 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"land/internal/files"
 	"land/internal/thumbs"
 )
-
-// thumbCache is per-process: thumbnails are cheap to regenerate and keeping them
-// out of the data directory preserves "land.exe + landisk.db" (architecture.md).
-var thumbCache = thumbs.New()
 
 // decodeSlots bounds concurrent image decoding; a folder of 200 photos would
 // otherwise pin every core while scrolling.
 const decodeSlots = 4
 
 var decodeSem = make(chan struct{}, decodeSlots)
+
+// thumbCache is the server-wide disk cache. It is initialised by app.New with a
+// directory under the system temp path; tests that build a Server directly get a
+// lazily created one on first use.
+var (
+	thumbCacheOnce sync.Once
+	thumbCache     *thumbs.Disk
+)
+
+// ThumbCacheDir is the cache location used when app.New does not override it.
+// The system temp directory keeps the program directory at exe + db.
+func ThumbCacheDir() string {
+	if dir := os.Getenv("LAND_THUMB_CACHE"); dir != "" {
+		return dir
+	}
+	return filepath.Join(os.TempDir(), "lanDisk-thumbs")
+}
+
+// SetThumbCache installs the cache built at startup (app.New calls this).
+func SetThumbCache(cache *thumbs.Disk) {
+	thumbCacheOnce.Do(func() { thumbCache = cache })
+}
+
+func (s *Server) thumbStore() *thumbs.Disk {
+	thumbCacheOnce.Do(func() {
+		cache, err := thumbs.NewDisk(ThumbCacheDir())
+		if err != nil {
+			cache, _ = thumbs.NewDisk(os.TempDir())
+		}
+		thumbCache = cache
+	})
+	return thumbCache
+}
 
 func (s *Server) handleThumb() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +91,7 @@ func (s *Server) handleThumb() http.HandlerFunc {
 		}
 
 		key := thumbs.Key{Path: abs, ModUnix: info.ModTime().Unix(), Size: info.Size(), Px: thumbs.Size}
-		data, mime, err := thumbCache.GetOrRender(r.Context(), key, func() ([]byte, string, error) {
+		data, mime, err := s.thumbStore().GetOrRender(r.Context(), key, func() ([]byte, string, error) {
 			decodeSem <- struct{}{}
 			defer func() { <-decodeSem }()
 			return thumbs.Render(abs, thumbs.Size)

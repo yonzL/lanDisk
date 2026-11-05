@@ -20,6 +20,7 @@ import (
 	"land/internal/httpapi"
 	"land/internal/logs"
 	"land/internal/store"
+	"land/internal/thumbs"
 	"land/internal/trash"
 	"land/internal/upload"
 )
@@ -95,6 +96,14 @@ func New(dbPath, version string, logger *slog.Logger) (*App, error) {
 	}
 
 	logWriter := logs.New(st, logger)
+	// Thumbnails are cached in the system temp directory: the program directory
+	// stays exe + db, and the OS may clean the cache whenever it likes.
+	thumbDir := httpapi.ThumbCacheDir()
+	if cache, err := thumbs.NewDisk(thumbDir); err != nil {
+		logger.Warn("缩略图缓存目录不可用，将退化为每次重新生成", "dir", thumbDir, "error", err)
+	} else {
+		httpapi.SetThumbCache(cache)
+	}
 
 	server := &httpapi.Server{
 		Store:    st,

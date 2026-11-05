@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func writePNG(t *testing.T, dir string, w, h int, alpha bool) string {
@@ -72,32 +73,69 @@ func TestRenderRejectsNonImage(t *testing.T) {
 	}
 }
 
-func TestCacheEvictsAndDeduplicates(t *testing.T) {
-	c := New()
+func TestDiskCachePersistsAcrossInstances(t *testing.T) {
+	dir := t.TempDir()
 	key := Key{Path: "a.png", ModUnix: 1, Size: 10, Px: 96}
 	calls := 0
 	render := func() ([]byte, string, error) {
 		calls++
-		return []byte("data"), "image/jpeg", nil
-	}
-	if _, _, err := c.GetOrRender(t.Context(), key, render); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := c.GetOrRender(t.Context(), key, render); err != nil {
-		t.Fatal(err)
-	}
-	if calls != 1 {
-		t.Fatalf("render called %d times, want 1 (cache hit)", calls)
+		return []byte("thumb-bytes"), "image/jpeg", nil
 	}
 
-	// A different version of the same file is a different key.
-	key2 := key
-	key2.ModUnix = 2
-	if _, _, err := c.GetOrRender(t.Context(), key2, render); err != nil {
-		t.Fatal(err)
+	first, err := NewDisk(dir)
+	if err != nil {
+		t.Fatalf("new disk: %v", err)
+	}
+	if _, _, err := first.GetOrRender(t.Context(), key, render); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("render called %d times, want 1", calls)
+	}
+
+	// A new instance (a service restart) reads the same file instead of decoding.
+	second, err := NewDisk(dir)
+	if err != nil {
+		t.Fatalf("new disk: %v", err)
+	}
+	data, mime, err := second.GetOrRender(t.Context(), key, render)
+	if err != nil {
+		t.Fatalf("cached render: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("render called %d times after restart, want 1 (disk hit)", calls)
+	}
+	if string(data) != "thumb-bytes" || mime != "image/jpeg" {
+		t.Fatalf("cached bytes = %q (%s)", data, mime)
+	}
+
+	// A different file version is a different key and renders again.
+	key.ModUnix = 2
+	if _, _, err := second.GetOrRender(t.Context(), key, render); err != nil {
+		t.Fatalf("render v2: %v", err)
 	}
 	if calls != 2 {
 		t.Fatalf("render called %d times, want 2 after the file changed", calls)
+	}
+}
+
+func TestDiskCachePrunesExpiredEntries(t *testing.T) {
+	dir := t.TempDir()
+	cache, err := NewDisk(dir)
+	if err != nil {
+		t.Fatalf("new disk: %v", err)
+	}
+	stale := filepath.Join(dir, "stale.jpg")
+	if err := os.WriteFile(stale, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * DiskMaxAge)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
+	}
+	cache.prune()
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Fatal("expired cache entry survived the prune")
 	}
 }
 

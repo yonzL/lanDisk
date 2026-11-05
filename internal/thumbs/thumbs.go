@@ -1,27 +1,34 @@
-// Package thumbs renders small previews of images for the file list. Thumbnails
-// are produced on demand and cached in memory only: the data directory must stay
-// "landisk.exe + landisk.db" (architecture.md "运行期文件").
+// Package thumbs renders small previews of images for the file list.
+//
+// Rendered thumbnails live on disk, in a sub-directory of the system temp
+// directory: the program directory stays "lanDisk.exe + landisk.db", and nothing
+// is held in the process heap beyond the bytes of one response. A cache is only
+// ever an optimisation here — a miss or a broken cache directory costs a decode.
 package thumbs
 
 import (
-	"container/list"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"image"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
 
 // Size is the edge length of a rendered thumbnail, in pixels. The list shows
-// 40 CSS px; 96 keeps it crisp on HiDPI screens without much cost.
+// 36 CSS px; 96 keeps it crisp on HiDPI screens without much cost.
 const Size = 96
 
-// maxEntries / maxBytes bound the cache. A LAN tool with a few hundred photos per
-// folder stays far below these; the limits exist so a huge folder cannot grow the
-// process without bound.
+// Disk cache bounds. Windows also cleans the temp directory on its own, so these
+// are guards rather than a lifecycle.
 const (
-	maxEntries = 512
-	maxBytes   = 64 << 20
+	DiskMaxBytes = 512 << 20
+	DiskMaxAge   = 7 * 24 * time.Hour
+	// pruneEvery triggers a size/age sweep after this many writes.
+	pruneEvery = 64
 )
 
 // Key identifies a rendered thumbnail. ModTime and file size make a stale entry
@@ -33,22 +40,19 @@ type Key struct {
 	Px      int
 }
 
-type entry struct {
-	key  Key
-	data []byte
-	mime string
+// fileName is the deterministic cache filename for a key: the same file version
+// maps to the same file, across restarts and across processes.
+func (k Key) fileName() string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%d|%d|%d", k.Path, k.ModUnix, k.Size, k.Px)))
+	return hex.EncodeToString(sum[:16])
 }
 
-// Cache is a size-bounded LRU of rendered thumbnails.
-type Cache struct {
-	mu      sync.Mutex
-	items   map[Key]*list.Element
-	order   *list.List // front = most recently used
-	bytes   int64
-	entries int
+// Disk is the on-disk thumbnail cache.
+type Disk struct {
+	dir string
 
-	// One decode at a time per key: two rows requesting the same image should not
-	// both spend CPU on it.
+	mu       sync.Mutex
+	writes   int
 	inflight map[Key]*call
 }
 
@@ -59,36 +63,47 @@ type call struct {
 	err  error
 }
 
-// New builds an empty cache.
-func New() *Cache {
-	return &Cache{
-		items:    map[Key]*list.Element{},
-		order:    list.New(),
-		inflight: map[Key]*call{},
+// NewDisk prepares the cache directory (creating it, pruning stale entries). An
+// error means the directory is unusable; callers can still render without caching.
+func NewDisk(dir string) (*Disk, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("thumbs: create cache dir: %w", err)
 	}
+	d := &Disk{dir: dir, inflight: map[Key]*call{}}
+	d.prune()
+	return d, nil
 }
 
-// Get returns a cached thumbnail, if present.
-func (c *Cache) Get(k Key) ([]byte, string, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.getLocked(k)
+// Dir reports the cache directory (used in logs).
+func (d *Disk) Dir() string { return d.dir }
+
+// Size reports how many entries and bytes the cache currently holds.
+func (d *Disk) Size() (files int, bytes int64) {
+	entries, err := os.ReadDir(d.dir)
+	if err != nil {
+		return 0, 0
+	}
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil || info.IsDir() {
+			continue
+		}
+		files++
+		bytes += info.Size()
+	}
+	return files, bytes
 }
 
-// GetOrRender returns the cached thumbnail or renders it once. Concurrent callers
+// GetOrRender returns a cached thumbnail or renders it once. Concurrent callers
 // for the same key wait on the first render instead of duplicating the work.
-func (c *Cache) GetOrRender(ctx context.Context, k Key, render func() ([]byte, string, error)) ([]byte, string, error) {
-	if data, mime, ok := c.Get(k); ok {
+func (d *Disk) GetOrRender(ctx context.Context, k Key, render func() ([]byte, string, error)) ([]byte, string, error) {
+	if data, mime, ok := d.load(k); ok {
 		return data, mime, nil
 	}
 
-	c.mu.Lock()
-	if data, mime, ok := c.getLocked(k); ok {
-		c.mu.Unlock()
-		return data, mime, nil
-	}
-	if existing, ok := c.inflight[k]; ok {
-		c.mu.Unlock()
+	d.mu.Lock()
+	if existing, ok := d.inflight[k]; ok {
+		d.mu.Unlock()
 		select {
 		case <-existing.done:
 			return existing.data, existing.mime, existing.err
@@ -97,56 +112,119 @@ func (c *Cache) GetOrRender(ctx context.Context, k Key, render func() ([]byte, s
 		}
 	}
 	pending := &call{done: make(chan struct{})}
-	c.inflight[k] = pending
-	c.mu.Unlock()
+	d.inflight[k] = pending
+	d.mu.Unlock()
 
 	data, mime, err := render()
 
-	c.mu.Lock()
+	d.mu.Lock()
 	pending.data, pending.mime, pending.err = data, mime, err
-	delete(c.inflight, k)
-	if err == nil {
-		c.storeLocked(k, data, mime)
+	delete(d.inflight, k)
+	d.writes++
+	shouldPrune := d.writes%pruneEvery == 0
+	d.mu.Unlock()
+
+	if err == nil && len(data) > 0 {
+		d.store(k, data, mime)
 	}
-	c.mu.Unlock()
+	if shouldPrune {
+		d.prune()
+	}
 	close(pending.done)
 	return data, mime, err
 }
 
-// storeLocked inserts an entry, evicting until both bounds hold.
-func (c *Cache) storeLocked(k Key, data []byte, mime string) {
-	if el, ok := c.items[k]; ok {
-		c.order.MoveToFront(el)
+// load reads a cached thumbnail from disk.
+func (d *Disk) load(k Key) ([]byte, string, bool) {
+	base := filepath.Join(d.dir, k.fileName())
+	for _, ext := range []string{"jpg", "png"} {
+		path := base + "." + ext
+		data, err := os.ReadFile(path)
+		if err != nil || len(data) == 0 {
+			continue
+		}
+		mime := "image/jpeg"
+		if ext == "png" {
+			mime = "image/png"
+		}
+		return data, mime, true
+	}
+	return nil, "", false
+}
+
+// store writes a thumbnail atomically (temp file + rename) so a concurrent reader
+// never sees a partial image.
+func (d *Disk) store(k Key, data []byte, mime string) {
+	ext := "jpg"
+	if mime == "image/png" {
+		ext = "png"
+	}
+	final := filepath.Join(d.dir, k.fileName()+"."+ext)
+	tmp, err := os.CreateTemp(d.dir, "tmp-*")
+	if err != nil {
 		return
 	}
-	el := c.order.PushFront(&entry{key: k, data: data, mime: mime})
-	c.items[k] = el
-	c.bytes += int64(len(data))
-	c.entries++
+	name := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(name)
+		return
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(name)
+		return
+	}
+	_ = os.Rename(name, final)
+}
 
-	for c.entries > maxEntries || c.bytes > maxBytes {
-		back := c.order.Back()
-		if back == nil {
-			break
+// prune drops entries older than DiskMaxAge and, if the directory is still over
+// DiskMaxBytes, the oldest files until it fits.
+func (d *Disk) prune() {
+	entries, err := os.ReadDir(d.dir)
+	if err != nil {
+		return
+	}
+	type fileInfo struct {
+		path string
+		mod  time.Time
+		size int64
+	}
+	files := make([]fileInfo, 0, len(entries))
+	var total int64
+	cutoff := time.Now().Add(-DiskMaxAge)
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil || info.IsDir() {
+			continue
 		}
-		old := back.Value.(*entry)
-		c.order.Remove(back)
-		delete(c.items, old.key)
-		c.bytes -= int64(len(old.data))
-		c.entries--
+		path := filepath.Join(d.dir, e.Name())
+		if info.ModTime().Before(cutoff) {
+			_ = os.Remove(path)
+			continue
+		}
+		files = append(files, fileInfo{path: path, mod: info.ModTime(), size: info.Size()})
+		total += info.Size()
+	}
+	if total <= DiskMaxBytes {
+		return
+	}
+	// Oldest first.
+	for i := 0; i < len(files); i++ {
+		for j := i + 1; j < len(files); j++ {
+			if files[j].mod.Before(files[i].mod) {
+				files[i], files[j] = files[j], files[i]
+			}
+		}
+	}
+	for _, f := range files {
+		if total <= DiskMaxBytes {
+			return
+		}
+		if err := os.Remove(f.path); err == nil {
+			total -= f.size
+		}
 	}
 }
-
-// Stats reports the cache size, for logs and tests.
-func (c *Cache) Stats() (entries int, bytes int64) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.entries, c.bytes
-}
-
-// Age is how long a rendered thumbnail may be reused; the key already carries the
-// mtime, so this only matters for entries whose file vanished and reappeared.
-const Age = time.Hour
 
 // ErrNotImage is returned when the file is not a supported image format.
 var ErrNotImage = fmt.Errorf("thumbs: not a supported image")
@@ -203,15 +281,4 @@ func maxInt(a, b int) int {
 		return a
 	}
 	return b
-}
-
-// getLocked is the cache hit path used while the mutex is already held.
-func (c *Cache) getLocked(k Key) ([]byte, string, bool) {
-	el, ok := c.items[k]
-	if !ok {
-		return nil, "", false
-	}
-	c.order.MoveToFront(el)
-	e := el.Value.(*entry)
-	return e.data, e.mime, true
 }

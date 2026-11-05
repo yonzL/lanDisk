@@ -281,6 +281,51 @@ go build -trimpath -ldflags "-s -w -X main.version=..."  → lanDisk.exe
 
 处理方式：`PreviewView` 在把文件名交给预览器之前，把 `#`、`?` 百分号编码（`escapeViewerName`）。预览器随后 `decodeURIComponent` 还原显示名，扩展名也从编码后的字符串里正确取到。回归检查脚本：`web/scripts/check-viewer-name.mjs`（直接对 `@file-viewer/core` 的 `normalizeFilename` / `getExtension` 断言）。
 
+
+## 缩略图（1.2.0 起，1.2.1 改为磁盘缓存）
+
+图片在列表里显示 36×36 缩略图，服务端按需生成：
+
+- **端点** `GET /api/shares/{id}/thumb?path=`：先过 `perms` 判读权限、`Resolve` 校验路径，再按扩展名白名单（jpg/jpeg/png/gif/bmp/webp）解码；非图片返回 404（前端回退图标）。
+- **渲染**：`golang.org/x/image` 解码（webp/bmp 走 x/image，其余走标准库），`CatmullRom` 缩放到 96 px 长边（不放大）；含透明通道输出 PNG，否则 JPEG q82。
+- **缓存（1.2.1）**：**只落磁盘**，位于系统临时目录下的 `lanDisk-thumbs/`（`%TEMP%`，服务运行时是服务账号的 temp），文件名 = `sha256(绝对路径|mtime|size|px)`；写入用临时文件 + rename 保证原子。**进程内不再持有缩略图数据**，避免堆内存随图片目录增长。
+  - 自清理：启动时与每 64 次写入扫一次，删除超过 7 天的条目；目录超过 512 MB 时按最旧优先删到限额以下。系统清理临时目录也只会让缓存失效一次。
+  - 可用 `LAND_THUMB_CACHE` 指定目录（测试用）。
+- **并发**：解码经 4 个信号量槽限流；同一键的并发请求共享一次渲染。
+- **HTTP**：`ETag` + `Cache-Control: private, max-age=3600`，`If-None-Match` 命中返回 304。
+
+## 已知缺口
+
+- **挂载点（`share_mounts`）没有入口**：表与 `Resolve` 的规则已存在，但后台既没有"登记 junction"的接口也没有候选扫描；因此共享内指向其他卷的 junction 目前会被安全不变量拒绝（安全的一侧失败），跨卷回收站分支因而不可达。
+- **IP 规则的 CSV 导入/导出未实现**（架构里列了接口）：目前只能逐条增删；主机名的导入/导出已实现。
+- **日志动作含 `upload_chunk`**：每个 4 MiB 分块一条记录。真实配置里如需降噪，可在 `actionFor` 里合并，但这会削弱"全量记录"的可核对性，暂按全量保留。
+- **复杂线型（SHX）**：DWG 引用了未内嵌的外部形状字体时（如 `ltypeshp.shx`），CAD 引擎的警告是**图纸数据层面的**，不是预览失败——引擎按虚线/点线近似渲染。要完全还原需要该 SHX 字体并接入 `shxGlyphResolver`，本期不做。
+- **Windows 服务未在提权环境实机验收**：`install`/`uninstall` 的 SCM 路径只做了代码与未提权报错验证。
+
+## 预览资源路径（1.0.3 起）
+
+预览的运行时资源**全部显式指派绝对路径**，不再依赖“全局资产基地址 + 文档地址”的隐式拼装：
+
+| 链路 | 显式选项 |
+|---|---|
+| PDF | `pdf.assetBaseUrl` / `workerUrl` / `cMapUrl` / `wasmUrl` / `standardFontDataUrl` |
+| Word | `docx.workerUrl` / `workerJsZipUrl` |
+| PPT / Excel | `presentation.workerUrl` / `spreadsheet.workerUrl` |
+| 压缩包 | `archive.workerUrl`（wasm 由 bundle 自行按自身位置解析） |
+| CAD | `cad.workerUrl` / `wasmPath` / `dwfWasmUrl` |
+| 3D 模型 | `model.workerUrl` / `runtimeUrl` / `wasmUrl` |
+
+背景：现场部署里 PDF worker 曾被解析成站根 `/vendor/pdf/pdf.worker.mjs`，而该路径被 SPA 回落接住返回了 `index.html`，浏览器把 HTML 当 ES module 导入，报 `Setting up fake worker failed` / `Failed to fetch dynamically imported module`。两点收口：
+
+1. 路径由代码写死（`/file-viewer/...`），与文档地址、反代前缀无关；
+2. `webui.isStaticSurface` 把 `/vendor/`、`/wasm/` 也当作静态面——丢前缀的请求返回 404，不再被 SPA 的 HTML 掩盖。
+
+## 预览文件名中的 `#` / `?`（1.1.2 起）
+
+预览器把 `name` 当 URL 解析：`normalizeFilename()` 会按 `#` / `?` 截断，截断后为空则回落到 `preview.bin`，于是 `#知识分享官#…-第2讲.mp4` 这类文件名被当成 `.bin`，界面上会显示"未装配 Binary Inspector renderer"。
+
+处理方式：`PreviewView` 在把文件名交给预览器之前，把 `#`、`?` 百分号编码（`escapeViewerName`）。预览器随后 `decodeURIComponent` 还原显示名，扩展名也从编码后的字符串里正确取到。回归检查脚本：`web/scripts/check-viewer-name.mjs`（直接对 `@file-viewer/core` 的 `normalizeFilename` / `getExtension` 断言）。
+
 ## 缩略图（1.2.0 起）
 
 图片在列表里显示 36×36 缩略图，服务端按需生成：
