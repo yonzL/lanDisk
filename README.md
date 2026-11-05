@@ -198,7 +198,8 @@ docs/                文档资源
 | 忘记口令 | 到服务器本机执行 `lanDisk.exe reset-password`（没有远程找回，因为不落口令文件） |
 | 服务起不来 | `eventvwr.msc` → Windows 日志 → 应用程序，来源 `LandDisk` |
 | 把自己锁在门外 | 本机 `127.0.0.1` 永远放行；从本机登录后台改 IP 规则 / 并发上限 |
-| 预览打不开 | 用 Chrome/Edge 近两个大版本；网络面板确认 `/file-viewer/` 下 Worker/WASM 为 200 |
+| 预览打不开（`Setting up fake worker failed` / `Failed to fetch dynamically imported module`） | 说明某条预览链路的 Worker 路径没带 `/file-viewer/` 前缀（1.0.2 及更早的缺陷）。升级到 **1.0.3+**，并 Ctrl+F5 强刷；网络面板里 `/vendor/*`、`/wasm/*` 应为 404，正确路径是 `/file-viewer/...` |
+| 预览打不开（其他） | 用 Chrome/Edge 近两个大版本；网络面板确认 `/file-viewer/` 下 Worker/WASM 为 200 |
 
 ## 🙏 致谢
 

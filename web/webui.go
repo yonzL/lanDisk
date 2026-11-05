@@ -83,8 +83,15 @@ func isHashedAsset(p string) bool {
 // directories, and root-level files such as /favicon.ico. Anything deeper is a
 // client route and gets index.html.
 func isStaticSurface(p string) bool {
-	if strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/preview-assets/") || strings.HasPrefix(p, "/file-viewer/") {
-		return true
+	// Viewer runtime assets live under /file-viewer/. The bare /vendor/ and
+	// /wasm/ prefixes exist only to make a mis-resolved asset path fail loudly
+	// (404) instead of being answered with the SPA shell — that mismatch is what
+	// turned a wrong PDF worker URL into "Failed to fetch dynamically imported
+	// module ... (text/html)" in the field.
+	for _, prefix := range []string{"/assets/", "/preview-assets/", "/file-viewer/", "/vendor/", "/wasm/"} {
+		if strings.HasPrefix(p, prefix) {
+			return true
+		}
 	}
 	rest := strings.TrimPrefix(p, "/")
 	return !strings.Contains(rest, "/") && path.Ext(rest) != ""

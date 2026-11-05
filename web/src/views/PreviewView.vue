@@ -31,11 +31,15 @@ const error = ref('')
 const fullscreen = ref(false)
 let controller: ViewerController | null = null
 
-// Self-hosted runtime assets. CAD and archive resolve their workers against the
-// document base by default, which the bundler cannot rewrite, so both are named
-// explicitly here; PDF/Office read the base URL set below.
-const CAD_BASE = '/file-viewer/wasm/cad/0.8.3/'
-const ARCHIVE_BASE = '/file-viewer/vendor/libarchive/'
+// Every runtime asset is named explicitly. Relying on the "global asset base"
+// alone was fragile: in a field deployment the PDF worker resolved to
+// /vendor/pdf/pdf.worker.mjs (site root, missing the /file-viewer prefix) and
+// PDF preview died with "Setting up fake worker failed". Explicit URLs make the
+// path independent of the document base, the router base and any proxy prefix.
+const ASSET = '/file-viewer/'
+const PDF = ASSET + 'vendor/pdf/'
+const CAD_BASE = ASSET + 'wasm/cad/0.8.3/'
+const MODEL_BASE = ASSET + 'wasm/model/'
 
 async function mount() {
   if (!host.value) return
@@ -51,6 +55,7 @@ async function mount() {
         import('@file-viewer/preset-engineering'),
       ])
 
+    // Keep the global base too: it covers renderers whose assets we cannot name.
     setDefaultFullAssetBaseUrl('/file-viewer')
 
     const preset = {
@@ -64,16 +69,38 @@ async function mount() {
       options: {
         preset,
         theme: 'light',
+        pdf: {
+          assetBaseUrl: ASSET,
+          workerUrl: PDF + 'pdf.worker.mjs',
+          cMapUrl: PDF + 'cmaps/',
+          wasmUrl: PDF + 'wasm/',
+          standardFontDataUrl: PDF + 'standard_fonts/',
+        },
+        docx: {
+          workerUrl: ASSET + 'vendor/docx/docx.worker.js',
+          workerJsZipUrl: ASSET + 'vendor/docx/jszip.min.js',
+        },
+        presentation: {
+          workerUrl: ASSET + 'vendor/pptx/pptx.worker.js',
+        },
+        spreadsheet: {
+          workerUrl: ASSET + 'vendor/xlsx/sheet.worker.js',
+        },
         cad: {
           workerUrl: CAD_BASE + 'dwg-worker.js',
           wasmPath: CAD_BASE,
           dwfWasmUrl: CAD_BASE + 'dwfv-render.wasm',
         },
+        model: {
+          workerUrl: MODEL_BASE + 'occt-worker.js',
+          runtimeUrl: MODEL_BASE + 'occt-import-js.js',
+          wasmUrl: MODEL_BASE + 'occt-import-js.wasm',
+        },
         archive: {
           // Only the worker URL: the libarchive bundle resolves libarchive.wasm
           // relative to its own location, and the renderer's wasm-URL patch does
           // not match this bundle's emscripten `locateFile` (it would break it).
-          workerUrl: ARCHIVE_BASE + 'worker-bundle.js',
+          workerUrl: ASSET + 'vendor/libarchive/worker-bundle.js',
         },
       },
     })

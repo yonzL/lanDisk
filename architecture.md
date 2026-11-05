@@ -254,3 +254,21 @@ go build -trimpath -ldflags "-s -w -X main.version=..."  → lanDisk.exe
 - **日志动作含 `upload_chunk`**：每个 4 MiB 分块一条记录。真实配置里如需降噪，可在 `actionFor` 里合并，但这会削弱"全量记录"的可核对性，暂按全量保留。
 - **复杂线型（SHX）**：DWG 引用了未内嵌的外部形状字体时（如 `ltypeshp.shx`），CAD 引擎的警告是**图纸数据层面的**，不是预览失败——引擎按虚线/点线近似渲染。要完全还原需要该 SHX 字体并接入 `shxGlyphResolver`，本期不做。
 - **Windows 服务未在提权环境实机验收**：`install`/`uninstall` 的 SCM 路径只做了代码与未提权报错验证。
+
+## 预览资源路径（1.0.3 起）
+
+预览的运行时资源**全部显式指派绝对路径**，不再依赖“全局资产基地址 + 文档地址”的隐式拼装：
+
+| 链路 | 显式选项 |
+|---|---|
+| PDF | `pdf.assetBaseUrl` / `workerUrl` / `cMapUrl` / `wasmUrl` / `standardFontDataUrl` |
+| Word | `docx.workerUrl` / `workerJsZipUrl` |
+| PPT / Excel | `presentation.workerUrl` / `spreadsheet.workerUrl` |
+| 压缩包 | `archive.workerUrl`（wasm 由 bundle 自行按自身位置解析） |
+| CAD | `cad.workerUrl` / `wasmPath` / `dwfWasmUrl` |
+| 3D 模型 | `model.workerUrl` / `runtimeUrl` / `wasmUrl` |
+
+背景：现场部署里 PDF worker 曾被解析成站根 `/vendor/pdf/pdf.worker.mjs`，而该路径被 SPA 回落接住返回了 `index.html`，浏览器把 HTML 当 ES module 导入，报 `Setting up fake worker failed` / `Failed to fetch dynamically imported module`。两点收口：
+
+1. 路径由代码写死（`/file-viewer/...`），与文档地址、反代前缀无关；
+2. `webui.isStaticSurface` 把 `/vendor/`、`/wasm/` 也当作静态面——丢前缀的请求返回 404，不再被 SPA 的 HTML 掩盖。
