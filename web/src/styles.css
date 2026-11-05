@@ -373,3 +373,17 @@ body {
 .land-header__title {
   white-space: nowrap;
 }
+
+/* Image thumbnails in the file list: a small rounded crop that lines up with the
+   icon column, so rows keep their height whether the entry is a photo or not. */
+.land-thumb {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--land-border);
+  background: #f5f7fa;
+  vertical-align: middle;
+  margin-right: 8px;
+  display: inline-block;
+}

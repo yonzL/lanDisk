@@ -409,6 +409,23 @@ function downloadZipOf(path: string) {
 
 // Remix Icon class per entry; the icons ship with the bundle, so the page stays
 // offline-capable (no icon CDN).
+const thumbFailed = ref<Record<string, boolean>>({})
+
+// Thumbnails are rendered by the server (decoded once, cached in memory), so a
+// folder of phone photos costs a few KB per row instead of the full file. When a
+// render fails the row falls back to its file-type icon.
+function isImage(entry: Entry) {
+  return /\.(jpe?g|png|gif|bmp|webp)$/i.test(entry.name)
+}
+
+function thumbUrl(entry: Entry) {
+  return `/api/shares/${shareId.value}/thumb?path=${encodeURIComponent(entry.path)}`
+}
+
+function markThumbFailed(entry: Entry) {
+  thumbFailed.value = { ...thumbFailed.value, [entry.path]: true }
+}
+
 function fileIcon(entry: Entry) {
   if (entry.is_dir) return 'ri-folder-3-fill land-icon--folder'
   const ext = entry.name.split('.').pop()?.toLowerCase() ?? ''
@@ -590,7 +607,15 @@ onMounted(async () => {
           </span></span>
         </template>
         <template #default="{ row }">
-          <i class="land-fileicon" :class="fileIcon(row)" />
+          <img
+            v-if="isImage(row) && !thumbFailed[row.path]"
+            class="land-thumb"
+            :src="thumbUrl(row)"
+            :alt="row.name"
+            loading="lazy"
+            @error="markThumbFailed(row)"
+          />
+          <i v-else class="land-fileicon" :class="fileIcon(row)" />
           <a v-if="!row.is_dir" class="land-file-link" @click="preview(row)">{{ row.name }}</a>
           <a v-else class="land-file-link" @click="enter(row)">{{ row.name }}</a>
         </template>

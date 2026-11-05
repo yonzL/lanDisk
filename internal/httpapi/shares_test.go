@@ -4,6 +4,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -825,5 +828,69 @@ func TestNoticeIsNormalisedToOneLine(t *testing.T) {
 	json.Unmarshal(rec.Body.Bytes(), &settings)
 	if runes := []rune(settings.Values["site_notice"]); len(runes) != 200 {
 		t.Fatalf("notice length = %d, want capped at 200", len(runes))
+	}
+}
+
+func TestThumbEndpoint(t *testing.T) {
+	srv, cookie := adminWithSession(t)
+	h := srv.Handler()
+	root := t.TempDir()
+
+	// A real PNG so decoding succeeds.
+	img := image.NewNRGBA(image.Rect(0, 0, 400, 200))
+	for y := 0; y < 200; y++ {
+		for x := 0; x < 400; x++ {
+			img.Set(x, y, color.NRGBA{R: 30, G: 120, B: 200, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "photo.png"), buf.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "notes.txt"), []byte("hi"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	body := `{"name":"s","virtual_path":"/s","root":` + quoteJSON(root) + `,"root_perm":"r"}`
+	if rec := doJSON(t, h, cookie, http.MethodPost, "/api/admin/shares", body); rec.Code != http.StatusCreated {
+		t.Fatalf("create share = %d %s", rec.Code, rec.Body)
+	}
+
+	rec := doJSON(t, h, nil, http.MethodGet, "/api/shares/1/thumb?path=photo.png", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("thumb = %d %s", rec.Code, rec.Body)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "image/jpeg" {
+		t.Fatalf("content-type = %q, want image/jpeg", ct)
+	}
+	etag := rec.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("no ETag on the thumbnail response")
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(rec.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("decode thumb: %v", err)
+	}
+	if cfg.Width != 96 || cfg.Height != 48 {
+		t.Fatalf("thumb = %dx%d, want 96x48", cfg.Width, cfg.Height)
+	}
+
+	// Conditional request is answered without a body.
+	req := httptest.NewRequest(http.MethodGet, "/api/shares/1/thumb?path=photo.png", nil)
+	req.Header.Set("If-None-Match", etag)
+	rec2 := httptest.NewRecorder()
+	h.ServeHTTP(rec2, req)
+	if rec2.Code != http.StatusNotModified {
+		t.Fatalf("conditional thumb = %d, want 304", rec2.Code)
+	}
+
+	// Non-images are refused, so the list can fall back to an icon.
+	if rec := doJSON(t, h, nil, http.MethodGet, "/api/shares/1/thumb?path=notes.txt", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("text thumb = %d, want 404", rec.Code)
+	}
+	if rec := doJSON(t, h, nil, http.MethodGet, "/api/shares/1/thumb?path=..%2Fsecret.png", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("escaping thumb path = %d, want 404", rec.Code)
 	}
 }

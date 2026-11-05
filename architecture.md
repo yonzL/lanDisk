@@ -89,6 +89,7 @@ tags: [go, vue3, sqlite, embed]
 | `GET /api/shares` | 当前访问者可见的共享列表（无读权限的共享/目录不出现） |
 | `GET /api/shares/{id}/list` | 目录列表：`path`、分页、`sort`、`order` |
 | `GET /api/shares/{id}/search` | 当前路径递归按文件名搜索 |
+| `GET /api/shares/{id}/thumb` | 图片缩略图（96 px，JPEG/PNG，`ETag` 条件请求；内存 LRU 缓存，不落盘） |
 | `GET /api/shares/{id}/raw` | 下载（支持 `Range`） |
 | `GET /api/shares/{id}/zip` | 目录流式打包 |
 | `POST /api/uploads` · `PUT /api/uploads/{id}/{n}` · `GET /api/uploads/{id}` · `POST /api/uploads/{id}/complete` · `DELETE /api/uploads/{id}` | 分片上传与续传；`DELETE` 放弃会话并删掉隐藏分块文件 |
@@ -279,3 +280,13 @@ go build -trimpath -ldflags "-s -w -X main.version=..."  → lanDisk.exe
 预览器把 `name` 当 URL 解析：`normalizeFilename()` 会按 `#` / `?` 截断，截断后为空则回落到 `preview.bin`，于是 `#知识分享官#…-第2讲.mp4` 这类文件名被当成 `.bin`，界面上会显示"未装配 Binary Inspector renderer"。
 
 处理方式：`PreviewView` 在把文件名交给预览器之前，把 `#`、`?` 百分号编码（`escapeViewerName`）。预览器随后 `decodeURIComponent` 还原显示名，扩展名也从编码后的字符串里正确取到。回归检查脚本：`web/scripts/check-viewer-name.mjs`（直接对 `@file-viewer/core` 的 `normalizeFilename` / `getExtension` 断言）。
+
+## 缩略图（1.2.0 起）
+
+图片在列表里显示 36×36 缩略图，服务端按需生成：
+
+- **端点** `GET /api/shares/{id}/thumb?path=`：先过 `perms` 判读权限、`Resolve` 校验路径，再按扩展名白名单（jpg/jpeg/png/gif/bmp/webp）解码；非图片返回 404（前端回退图标）。
+- **渲染**：`golang.org/x/image` 解码（webp/bmp 走 x/image，其余走标准库），`CatmullRom` 缩放到 96 px 长边（不放大）；含透明通道输出 PNG，否则 JPEG q82。
+- **缓存**：进程内 LRU（最多 512 条 / 64 MB），键为 `(绝对路径, mtime, size, px)`——文件一改就是新键，旧条目自然淘汰；不落盘，保持"运行期只有 exe + db"。
+- **并发**：解码经 4 个信号量槽限流，滚动大图目录不会打满 CPU；同一键的并发请求共享一次渲染。
+- **HTTP**：`ETag` + `Cache-Control: private, max-age=3600`，`If-None-Match` 命中返回 304。

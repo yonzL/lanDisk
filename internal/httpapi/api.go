@@ -92,6 +92,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/uploads/{id}/{index}", s.handleUploadChunk())
 	mux.HandleFunc("POST /api/uploads/{id}/complete", s.handleUploadComplete())
 	mux.HandleFunc("DELETE /api/uploads/{id}", s.handleUploadAbort())
+	mux.HandleFunc("GET /api/shares/{id}/thumb", s.handleThumb())
 	mux.HandleFunc("GET /api/shares/{id}/raw", s.handleRaw())
 	mux.HandleFunc("GET /api/shares/{id}/zip", s.handleZip())
 
