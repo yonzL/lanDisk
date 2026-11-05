@@ -273,3 +273,9 @@ go build -trimpath -ldflags "-s -w -X main.version=..."  → lanDisk.exe
 
 1. 路径由代码写死（`/file-viewer/...`），与文档地址、反代前缀无关；
 2. `webui.isStaticSurface` 把 `/vendor/`、`/wasm/` 也当作静态面——丢前缀的请求返回 404，不再被 SPA 的 HTML 掩盖。
+
+## 预览文件名中的 `#` / `?`（1.1.2 起）
+
+预览器把 `name` 当 URL 解析：`normalizeFilename()` 会按 `#` / `?` 截断，截断后为空则回落到 `preview.bin`，于是 `#知识分享官#…-第2讲.mp4` 这类文件名被当成 `.bin`，界面上会显示"未装配 Binary Inspector renderer"。
+
+处理方式：`PreviewView` 在把文件名交给预览器之前，把 `#`、`?` 百分号编码（`escapeViewerName`）。预览器随后 `decodeURIComponent` 还原显示名，扩展名也从编码后的字符串里正确取到。回归检查脚本：`web/scripts/check-viewer-name.mjs`（直接对 `@file-viewer/core` 的 `normalizeFilename` / `getExtension` 断言）。

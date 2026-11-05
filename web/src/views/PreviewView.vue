@@ -41,6 +41,12 @@ const PDF = ASSET + 'vendor/pdf/'
 const CAD_BASE = ASSET + 'wasm/cad/0.8.3/'
 const MODEL_BASE = ASSET + 'wasm/model/'
 
+// escapeViewerName keeps '#' and '?' out of the filename the viewer parses; it
+// percent-decodes names before deciding the format, so the original name survives.
+function escapeViewerName(name: string) {
+  return name.replace(/#/g, '%23').replace(/\?/g, '%3F')
+}
+
 async function mount() {
   if (!host.value) return
   loading.value = true
@@ -65,7 +71,12 @@ async function mount() {
     }
     controller = mountViewer(host.value, {
       url: rawUrl.value,
-      name: fileName.value,
+      // The viewer derives the format from `name`, but it splits the string on
+      // '#' and '?' as if it were a URL. A file literally called "#说明.pdf" then
+      // becomes "" and falls back to preview.bin (binary inspector). Percent-
+      // encoding those two characters keeps the real name once the viewer
+      // decodes it, and the extension is read from the encoded form either way.
+      name: escapeViewerName(fileName.value),
       options: {
         preset,
         theme: 'light',
