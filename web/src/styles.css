@@ -87,18 +87,6 @@ body {
 }
 
 
-.land-notice {
-  max-width: 1280px;
-  margin: 12px auto -8px;
-  padding: 10px 16px;
-  width: calc(100% - 48px);
-  background: #fff;
-  border: 1px solid var(--land-border);
-  border-left: 3px solid var(--el-color-primary);
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--land-text);
-}
 
 /* chfs-style listing chrome */
 .land-list-card .el-card__body {
@@ -309,4 +297,79 @@ body {
 .land-th {
   font-weight: 700;
   color: #333;
+}
+
+
+/* Header announcement: a single line that scrolls only when it does not fit.
+   Two copies of the text make the loop seamless; hovering pauses it. */
+.land-ticker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0 16px;
+  color: #606266;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.land-ticker__icon {
+  flex: 0 0 auto;
+  font-size: 15px;
+  color: var(--el-color-primary);
+}
+
+.land-ticker__viewport {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+}
+
+.land-ticker__track {
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+.land-ticker__track.is-scrolling {
+  animation: land-ticker-scroll 26s linear infinite;
+}
+
+.land-ticker:hover .land-ticker__track.is-scrolling {
+  animation-play-state: paused;
+}
+
+.land-ticker__text {
+  padding-right: 64px;
+}
+
+.land-ticker__track:not(.is-scrolling) .land-ticker__text {
+  padding-right: 0;
+}
+
+@keyframes land-ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .land-ticker__track.is-scrolling {
+    animation: none;
+  }
+}
+
+/* The header keeps its shape: the brand never wraps, the ticker takes the slack. */
+.land-header__brand {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.land-header__title {
+  white-space: nowrap;
 }

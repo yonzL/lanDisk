@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { siteApi, type Site } from './api'
@@ -8,6 +8,27 @@ import { SESSION_EXPIRED_EVENT, ensureSession, logout, session } from './session
 const router = useRouter()
 const route = useRoute()
 const site = ref<Site>({ title: 'lan disk', notice: '', version: '' })
+
+// The announcement is one line in the header. It only animates when the text is
+// actually wider than its slot, so a short notice sits still instead of showing
+// the duplicated copy a marquee loop needs.
+const tickerViewport = ref<HTMLElement | null>(null)
+const tickerText = ref<HTMLElement | null>(null)
+const tickerScrolls = ref(false)
+let viewportObserver: ResizeObserver | undefined
+
+async function measureTicker() {
+  if (!site.value.notice) {
+    tickerScrolls.value = false
+    return
+  }
+  tickerScrolls.value = false // measure with a single copy
+  await nextTick()
+  const viewport = tickerViewport.value
+  const text = tickerText.value
+  if (!viewport || !text) return
+  tickerScrolls.value = text.scrollWidth > viewport.clientWidth + 1
+}
 
 onMounted(async () => {
   // A failed probe just means "not logged in"; the pages handle that state.
@@ -21,11 +42,21 @@ onMounted(async () => {
     // Keep the defaults when the server is unreachable.
   }
   window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired)
+  window.addEventListener('resize', measureTicker)
+  await measureTicker()
+  if (tickerViewport.value && typeof ResizeObserver !== 'undefined') {
+    viewportObserver = new ResizeObserver(() => void measureTicker())
+    viewportObserver.observe(tickerViewport.value)
+  }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired)
+  window.removeEventListener('resize', measureTicker)
+  viewportObserver?.disconnect()
 })
+
+watch(() => site.value.notice, () => void measureTicker())
 
 function onSessionExpired() {
   ElMessage.warning('登录状态已失效，请重新登录')
@@ -62,12 +93,26 @@ async function onUserCommand(command: string) {
 }
 </script>
 
+
 <template>
   <header class="land-header">
     <router-link to="/" class="land-header__brand">
       <div class="land-header__logo">L</div>
       <div class="land-header__title">{{ site.title }}</div>
     </router-link>
+
+    <!-- Announcement: one line, sharing the header row with the account button.
+         It is plain text (no HTML) and only scrolls when it overflows. -->
+    <div v-if="site.notice" class="land-ticker" :title="site.notice">
+      <i class="ri-notification-3-line land-ticker__icon" />
+      <div ref="tickerViewport" class="land-ticker__viewport">
+        <div class="land-ticker__track" :class="{ 'is-scrolling': tickerScrolls }">
+          <span ref="tickerText" class="land-ticker__text">{{ site.notice }}</span>
+          <span v-if="tickerScrolls" class="land-ticker__text" aria-hidden="true">{{ site.notice }}</span>
+        </div>
+      </div>
+    </div>
+
     <div class="land-header__spacer" />
 
     <el-dropdown v-if="session.authenticated" trigger="click" @command="onUserCommand">
@@ -103,7 +148,6 @@ async function onUserCommand(command: string) {
     <el-button v-else text @click="router.push('/login')">登录</el-button>
   </header>
 
-  <div v-if="site.notice" class="land-notice" v-html="site.notice" />
 
   <main :class="['land-main', { 'land-main--full': route.name === 'preview' }]">
     <router-view />

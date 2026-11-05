@@ -14,6 +14,9 @@
   <a href="./goal-and-requirements.md">需求与边界</a>
 </p>
 
+> [!IMPORTANT]
+> **AI 生成声明**：本项目的源代码、文档与发布产物由 **AI 编程助手（Pi / ThinkRail）** 在维护者 [yonzL](https://github.com/yonzL) 的需求、评审与验收下生成。AI 产出可能存在疏漏或安全缺陷，**投入使用前请自行审查**；本项目按 MIT「按原样」提供，不附带任何担保。详见 [AI 生成声明](#-ai-生成声明)。
+
 **lan disk** 是一个**单 exe、零安装、零外网依赖**的局域网 HTTP 文件服务器：Go 后端把本机目录通过浏览器共享给同网段的设备，Vue 3 前端提供文件管理，[FileViewer](https://doc.file-viewer.app/zh/) 负责在浏览器里直接预览 PDF / Word / Excel / PPT / 图片 / 音视频 / 压缩包 / CAD / 3D 模型——**解析和渲染全在浏览器里完成，服务端不做任何转码**。
 
 功能面对标 [chfs](http://iscute.cn/chfs)（多共享目录、目录级写权限、上传、打包下载、访问日志、IP 过滤、限速），补上 chfs 最弱的一环：**文件点开就能看**，而不是只能下载到本地。
@@ -26,6 +29,7 @@
 ![stack](https://img.shields.io/badge/Go%20%2B-Vue%203-blue)
 ![preview](https://img.shields.io/badge/preview-200%2B%20formats-orange)
 ![size](https://img.shields.io/badge/exe-69MB-brightgreen)
+![AI](https://img.shields.io/badge/generated%20by-AI-orange)
 
 ## 🎯 和 chfs / 网盘比
 
@@ -212,10 +216,30 @@ docs/                文档资源
 | 预览 | [FileViewer](https://doc.file-viewer.app/)（Apache-2.0，含 PDF.js）、[libarchive](https://libarchive.org/) WASM（BSD-2-Clause）、[Comlink](https://github.com/GoogleChromeLabs/comlink) |
 | CAD / DWF | [@flyfish-dev/cad-viewer](https://www.npmjs.com/package/@flyfish-dev/cad-viewer)（**AGPL-3.0**，内含 GPL-3.0 的 LibreDWG 与 AGPL-3.0 的 dwf-viewer）、[shx-parser](https://www.npmjs.com/package/@mlightcad/shx-parser)、[dxf-parser](https://www.npmjs.com/package/dxf-parser) |
 
-> ⚠️ **许可证提示**：本项目自身代码是 **MIT**，但 CAD/DWF 预览链路依赖 **AGPL-3.0-only** 的 cad-viewer。**带 CAD 预览的构建产物在分发时受 AGPL-3.0 约束**（网络使用者有权获取对应源码）。若需要纯 MIT 分发，按上面的构建命令**去掉 `cad`、`model` 两个 renderer** 重新构建即可。
-
-
-> **AGPL 对应源码**：带 CAD 预览的构建在提供网络服务时，使用者可向 <https://github.com/yonzL/lanDisk> 与 [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md#agpl-30-合规说明网络分发) 列出的上游仓库获取完整对应源码。
+## 🧾 许可证
 
 本项目代码以 [MIT License](./LICENSE) 发布 © 2026 yonzL；随包分发的第三方组件沿用各自许可，详见 [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md)。
 
+> ⚠️ **许可证提示**：本项目自身代码是 **MIT**，但 CAD/DWF 预览链路依赖 **AGPL-3.0-only** 的 cad-viewer。**带 CAD 预览的构建产物在分发时受 AGPL-3.0 约束**（网络使用者有权获取对应源码）。若需要纯 MIT 分发，按上面的构建命令**去掉 `cad`、`model` 两个 renderer** 重新构建即可。
+
+> **AGPL 对应源码**：带 CAD 预览的构建在提供网络服务时，使用者可向 <https://github.com/yonzL/lanDisk> 与 [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md#agpl-30-合规说明网络分发) 列出的上游仓库获取完整对应源码。
+
+## 🤖 AI 生成声明
+
+本仓库的代码、文档、发布说明与发布产物（`lanDisk-*.zip`）由 **AI 编程助手**（Pi / ThinkRail）在维护者的需求输入与逐轮评审下生成，包括：
+
+- **代码**：Go 后端（`internal/*`、`cmd/land`）、Vue 3 前端（`web/src`）、CI 配置；
+- **文档**：`README.md`、`architecture.md`、`goal-and-requirements.md`、`THIRD-PARTY-NOTICES.md`、发布说明；
+- **发布产物**：`.github/workflows/release.yml` 在 tag 上自动构建出的 Windows 二进制压缩包。
+
+维护者负责**方向与验收**：提出需求、拍板架构与取舍、在现场部署验证、逐条确认评审意见；AI 负责实现与自测（`go test ./...`、无头浏览器截图与网络抓包验证等）。
+
+### 使用前请注意
+
+- AI 输出**不保证无缺陷**，尤其是权限判定、路径越界、并发与资源释放这类安全敏感路径，请按自己的场景做一次代码审查与针对性验证。
+- 本项目按 **MIT「按原样」** 提供，不提供任何明示或暗示的担保（见 [LICENSE](./LICENSE)）。
+- 若用于对外服务，请先完成：强口令、IP 白名单、日志留存、备份策略，以及 CAD 预览的 AGPL-3.0 合规（见 [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md)）。
+
+### 发现 AI 引入的问题
+
+欢迎直接提 [Issue](https://github.com/yonzL/lanDisk/issues)，附上复现步骤、`lanDisk.exe version` 输出与相关日志（`eventvwr.msc` → 应用程序 → 来源 `LandDisk`）。

@@ -45,13 +45,19 @@ func (s *Server) handlePutSettings() http.HandlerFunc {
 				writeError(w, http.StatusBadRequest, "unknown_setting", "未知配置项："+key)
 				return
 			}
-			if err := s.Store.SetSetting(r.Context(), key, strings.TrimSpace(value)); err != nil {
+			value = strings.TrimSpace(value)
+			if key == store.KeySiteNotice {
+				// The header renders the notice as one scrolling line, so it is
+				// normalised on write: no newlines, no control characters, capped
+				// length. HTML is no longer rendered, so tags would show verbatim.
+				value = normalizeNotice(value)
+			}
+			if err := s.Store.SetSetting(r.Context(), key, value); err != nil {
 				writeError(w, http.StatusBadRequest, "invalid_setting", err.Error())
 				return
 			}
 			changed = append(changed, key)
 		}
-		// Apply rate/IP changes immediately instead of waiting for the sweep.
 		s.RefreshRuntimeLimits(r.Context())
 		writeJSON(w, http.StatusOK, map[string]any{"updated": changed})
 	})
@@ -128,4 +134,25 @@ func (s *Server) handleDeleteIPRule() http.HandlerFunc {
 		s.RefreshRuntimeLimits(r.Context())
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 	})
+}
+
+// maxNoticeRunes keeps the announcement readable while scrolling.
+const maxNoticeRunes = 200
+
+// normalizeNotice collapses an announcement to a single line: newlines become
+// spaces, control characters are dropped, and the length is capped.
+func normalizeNotice(value string) string {
+	replaced := strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ").Replace(value)
+	cleaned := strings.Map(func(r rune) rune {
+		if r < 32 {
+			return -1
+		}
+		return r
+	}, replaced)
+	cleaned = strings.Join(strings.Fields(cleaned), " ")
+	runes := []rune(cleaned)
+	if len(runes) > maxNoticeRunes {
+		return string(runes[:maxNoticeRunes])
+	}
+	return cleaned
 }

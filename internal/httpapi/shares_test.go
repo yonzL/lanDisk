@@ -797,3 +797,33 @@ func TestLogTargetShowsDecodedChinesePath(t *testing.T) {
 		t.Fatalf("log path still percent-encoded: %q", path)
 	}
 }
+
+func TestNoticeIsNormalisedToOneLine(t *testing.T) {
+	_, srv, cookie := mkdirRoot(t)
+	h := srv.Handler()
+
+	payload := `{"values":{"site_notice":"第一行\n第二行\t<b>粗体</b>   多空格"}}`
+	if rec := doJSON(t, h, cookie, http.MethodPut, "/api/admin/settings", payload); rec.Code != http.StatusOK {
+		t.Fatalf("put settings = %d %s", rec.Code, rec.Body)
+	}
+	rec := doJSON(t, h, cookie, http.MethodGet, "/api/admin/settings", "")
+	var settings settingsResponse
+	json.Unmarshal(rec.Body.Bytes(), &settings)
+	notice := settings.Values["site_notice"]
+	if strings.ContainsAny(notice, "\n\r\t") {
+		t.Fatalf("notice still contains a line break: %q", notice)
+	}
+	if notice != "第一行 第二行 <b>粗体</b> 多空格" {
+		t.Fatalf("notice = %q", notice)
+	}
+
+	// Length is capped so a huge paste cannot push the header around.
+	long := strings.Repeat("长", 300)
+	payload = `{"values":{"site_notice":` + quoteJSON(long) + `}}`
+	doJSON(t, h, cookie, http.MethodPut, "/api/admin/settings", payload)
+	rec = doJSON(t, h, cookie, http.MethodGet, "/api/admin/settings", "")
+	json.Unmarshal(rec.Body.Bytes(), &settings)
+	if runes := []rune(settings.Values["site_notice"]); len(runes) != 200 {
+		t.Fatalf("notice length = %d, want capped at 200", len(runes))
+	}
+}

@@ -101,8 +101,8 @@ onMounted(load)
       <el-form-item label="网页标题">
         <el-input v-model="form.site_title" />
       </el-form-item>
-      <el-form-item label="顶部公告（支持 HTML）">
-        <el-input v-model="form.site_notice" type="textarea" :rows="3" />
+      <el-form-item label="顶部公告（单行文字，随页头滚动显示；不支持 HTML）">
+        <el-input v-model="form.site_notice" maxlength="200" show-word-limit placeholder="单行公告，顶部滚动显示" />
       </el-form-item>
 
       <el-divider>运行参数</el-divider>
