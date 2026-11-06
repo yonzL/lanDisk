@@ -23,6 +23,8 @@ type Server struct {
 	Version  string
 	Logger   *slog.Logger
 	Throttle *auth.Throttle
+
+	spa      http.Handler
 	Logs     *logs.Writer
 	IPFilter *ipFilter
 	Limiter  *concurrencyLimiter
@@ -113,7 +115,7 @@ func (s *Server) Handler() http.Handler {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint: "+r.Method+" "+r.URL.Path)
 	})
 
-	mux.Handle("/", webui.Handler())
+	mux.Handle("/", s.legacyHandler())
 
 	h := s.ipFilterMiddleware(s.concurrencyMiddleware(mux))
 	return recoverMiddleware(s.logger(), s.logMiddleware(h))

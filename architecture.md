@@ -352,3 +352,12 @@ go build -trimpath -ldflags "-s -w -X main.version=..."  → lanDisk.exe
 - 本地构建顺序固定为 `bun run build` → `bun run check:dist` → `go build`；`web/scripts/check-dist-fresh.mjs` 在 `web/dist` 比 `web/src` 旧时直接失败。
 - CI 在 tag 上先构建前端再编译，产物不会出现这种错配。
 - 现场遇到旧前缀请求时，先看 `GET /api/health` 的 `version` 与 `preview_assets`，再对比浏览器实际加载的 `assets/index-*.js` 的名字是否随升级变化（名字不变就是浏览器缓存了旧页面）。
+
+## IE11 兼容模式（1.3.0 起）
+
+现场存在只有 IE11 的机器，而 Vue 3 需要 `Proxy`/ES modules、FileViewer 需要 Worker/WASM，IE11 一个都没有。因此：
+
+- **不做降级编译**（把 Vue 3 与预览器“降”到 ES5 不可行），改成**第二套渲染路径**：`internal/httpapi/lite.go` 用 `html/template` 直接输出 HTML，无任何 JavaScript，只用表格、链接与普通 `form`。
+- **入口由 UA 决定**：`legacyHandler` 检查 `Trident/7.0` 或 `MSIE `；命中则把 `/`、`/s/{id}[/path]` 与 `/lite/s/{id}[/path]` 映射到简易页，其余请求仍交给 SPA。`?modern=1` 可强制走完整界面（便携浏览器/排查用）。
+- **能力边界**：简易页只做匿名可做的事——浏览、下载（复用 `/api/shares/{id}/raw`）、上传（multipart 流式写入目标目录，落盘后 rename）、新建目录；需要写权限目录才显示表单。没有登录、没有预览、没有回收站/备注编辑。
+- **上传实现**：`r.MultipartReader()` 逐 part 处理，文件直接流式写进目标目录的临时文件再改名，不经过 `web/dist`、不依赖分片协议（IE11 只有一次性 multipart）。

@@ -210,6 +210,17 @@ docs/                文档资源
 | 预览报 `Setting up fake worker failed`（URL 里没有 `/file-viewer/` 前缀） | 说明跑的是 1.0.3 之前的老版本。`curl http://<host>/api/health` 看 `version` 与 `preview_assets`（完整构建约 337）；升级到最新版并 Ctrl+F5 |
 | 预览打不开（其他） | 用 Chrome/Edge 近两个大版本；网络面板确认 `/file-viewer/` 下 Worker/WASM 为 200 |
 
+
+## 🧓 只有 IE11 的机器
+
+现场若只能使用 Internet Explorer 11（典型于锁定的 Windows 7），打开同一地址会自动进入**兼容模式**：一套服务端渲染、零 JavaScript 的页面，支持
+
+- 浏览共享目录（文件名 / 备注 / 大小 / 修改时间）
+- 下载文件
+- 上传文件、新建文件夹（需要该目录开启了写权限）
+
+**兼容模式没有在线预览**（IE11 无法运行 FileViewer 所需的 Worker/WASM），页面会提示用 Chrome / Edge 打开同一地址获得完整界面；`?modern=1` 可在 IE 中强制尝试完整界面。管理员功能（登录、共享配置、日志、回收站）请使用现代浏览器。
+
 ## 🙏 致谢
 
 本项目的功能面对标 [chfs / CuteHttpFileServer](http://iscute.cn/chfs)，预览能力来自 [FileViewer](https://github.com/flyfish-dev/file-viewer)。完整清单与许可见 **[THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md)**：
