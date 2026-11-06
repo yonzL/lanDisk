@@ -342,3 +342,13 @@ go build -trimpath -ldflags "-s -w -X main.version=..."  → lanDisk.exe
 - **视频/音频不走 FileViewer**：media renderer 的接口是 `render(buffer, …)`——文件会先被整包读进内存，2 GB 视频等于先下载完再播。所以 `PreviewView` 对 mp4/m4v/webm/ogv/mov/mkv 与 mp3/wav/m4a/aac/flac/ogg/opus 直接交给原生 `<video>`/`<audio>`，`src` 指向流式端点。
 - **流式端点** `GET /api/shares/{id}/content?path=`：`Content-Type` 按扩展名（video/mp4、video/webm…），`Content-Disposition: inline`、`X-Content-Type-Options: nosniff`，由 `http.ServeContent` 处理 Range/If-Range（`206` + `Content-Range` + `Accept-Ranges`）。`/raw` 保持 `attachment`，只用于下载按钮。
 - **不可解码格式**：WMV/WMA、ASF、AVI、RMVB、FLV、MPEG/VOB/TS、3GP、DivX 等浏览器内核根本不支持，页面直接显示「浏览器无法播放该格式」+ 下载入口；能播放的容器里编码不被支持（H.265 等）时由 `<video @error>` 触发提示。
+
+## 版本号与前端产物的同步（1.2.5 起有构建守卫）
+
+`go build` 通过 `//go:embed all:dist` 嵌入**构建那一刻**的前端产物，而 `main.version` 来自 `-ldflags`。两者不同步时，二进制会自称新版本、实际跑旧页面——现场表现就是预览去请求旧前缀（`/vendor/pdf/pdf.worker.mjs`），继而被 SPA 回落成 HTML，报 `Setting up fake worker failed`。
+
+因此：
+
+- 本地构建顺序固定为 `bun run build` → `bun run check:dist` → `go build`；`web/scripts/check-dist-fresh.mjs` 在 `web/dist` 比 `web/src` 旧时直接失败。
+- CI 在 tag 上先构建前端再编译，产物不会出现这种错配。
+- 现场遇到旧前缀请求时，先看 `GET /api/health` 的 `version` 与 `preview_assets`，再对比浏览器实际加载的 `assets/index-*.js` 的名字是否随升级变化（名字不变就是浏览器缓存了旧页面）。

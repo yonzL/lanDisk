@@ -134,6 +134,7 @@ bun install
 bunx --no-install file-viewer-copy-assets ./public/file-viewer \
   --renderers office-word-openxml,spreadsheet-openxml,office-presentation,pdf,archive,cad,model
 bun run build            # → web/dist（含 51 MB 自托管预览资源）
+bun run check:dist       # 失败说明改过前端却忘了重新 build
 
 # 2. 后端（Go 1.25+）
 cd ..
@@ -141,6 +142,8 @@ go test ./...
 go build -trimpath -ldflags "-s -w -X main.version=1.0.0" -o lanDisk.exe ./cmd/land
 ```
 
+> **构建顺序很重要**：`go build` 会把**当时的** `web/dist` 嵌进 exe，而版本号来自 `-ldflags`。改过前端却没重新 `bun run build`，就会得到一个"版本号是新的、页面是旧的"二进制——现场症状通常是预览去请求了不正确的前缀（例如 `/vendor/pdf/pdf.worker.mjs` 而不是 `/file-viewer/vendor/pdf/pdf.worker.mjs`）。`bun run check:dist` 会在 dist 比源码旧时直接失败，构建前先跑它。
+>
 > 网络受限时 Go 模块代理需要走镜像：`GOPROXY=https://goproxy.cn,direct go get <module>`
 >
 > 预览资源只复制实际用到的 renderer（51 MB）；全量是 191 MB。`web/public/file-viewer/` 不进仓库，按上面第二条命令生成。

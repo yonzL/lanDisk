@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && bun scripts/keep-dist.ts",
+    "check:dist": "bun scripts/check-dist-fresh.mjs",
     "typecheck": "vue-tsc --noEmit",
     "preview": "vite preview"
   },
