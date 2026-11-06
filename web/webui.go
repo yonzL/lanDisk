@@ -3,10 +3,37 @@ package webui
 import (
 	"embed"
 	"io/fs"
+	"mime"
 	"net/http"
 	"path"
 	"strings"
 )
+
+// The MIME table for these extensions comes from the OS registry on Windows and
+// differs between machines; .mjs in particular is missing on some, which makes a
+// module worker fail to load. Register what the viewer needs unconditionally.
+func init() {
+	for ext, typ := range map[string]string{
+		".mjs":   "text/javascript; charset=utf-8",
+		".js":    "text/javascript; charset=utf-8",
+		".wasm":  "application/wasm",
+		".woff2": "font/woff2",
+		".woff":  "font/woff",
+		".ttf":   "font/ttf",
+		".json":  "application/json",
+		".map":   "application/json",
+		".svg":   "image/svg+xml",
+		".webp":  "image/webp",
+		".avif":  "image/avif",
+		".mp4":   "video/mp4",
+		".webm":  "video/webm",
+		".mkv":   "video/x-matroska",
+		".m3u8":  "application/vnd.apple.mpegurl",
+		".ts":    "video/mp2t",
+	} {
+		_ = mime.AddExtensionType(ext, typ)
+	}
+}
 
 //go:embed all:dist
 var embedded embed.FS
