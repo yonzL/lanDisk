@@ -31,6 +31,38 @@ func FS() fs.FS {
 	return sub
 }
 
+// viewerAlias maps a root-relative viewer asset path onto the canonical
+// /file-viewer/ prefix. The viewer resolves some workers against the document
+// base; without this alias a build whose viewer bundle regresses to "/vendor/…"
+// fails in the field with "Setting up fake worker failed" (seen on 10.7.39.x with
+// an older release). Serving the same embedded bytes under both prefixes makes
+// that class of mistake harmless.
+func viewerAlias(clean string) (string, bool) {
+	for _, prefix := range []string{"/vendor/", "/wasm/"} {
+		if strings.HasPrefix(clean, prefix) {
+			return "/file-viewer" + clean, true
+		}
+	}
+	return "", false
+}
+
+// AssetCount reports how many files are embedded under /file-viewer, so the health
+// endpoint can show whether a deployment actually carries the preview runtime.
+func AssetCount() int {
+	root := FS()
+	count := 0
+	_ = fs.WalkDir(root, "file-viewer", func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !d.IsDir() {
+			count++
+		}
+		return nil
+	})
+	return count
+}
+
 // Handler serves the SPA: real files when they exist, index.html for client
 // routes. API and preview-asset paths are never answered here — they are
 // registered on the same mux and win over this catch-all.
@@ -41,6 +73,21 @@ func Handler() http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		clean := path.Clean("/" + strings.TrimPrefix(r.URL.Path, "/"))
+		// Root-relative viewer assets are served from the canonical prefix (see
+		// viewerAlias) before anything else looks at the path.
+		if target, ok := viewerAlias(clean); ok {
+			if f, err := root.Open(strings.TrimPrefix(target, "/")); err == nil {
+				info, statErr := f.Stat()
+				f.Close()
+				if statErr == nil && !info.IsDir() {
+					w.Header().Set("Cache-Control", "public, max-age=86400")
+					alias := r.Clone(r.Context())
+					alias.URL.Path = target
+					fileServer.ServeHTTP(w, alias)
+					return
+				}
+			}
+		}
 		if f, err := root.Open(strings.TrimPrefix(clean, "/")); err == nil {
 			info, statErr := f.Stat()
 			f.Close()

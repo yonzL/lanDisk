@@ -387,3 +387,51 @@ body {
   margin-right: 8px;
   display: inline-block;
 }
+
+/* Shown instead of the viewer when the browser cannot decode the format. */
+.land-preview__unsupported {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 48px 24px;
+  background: #fff;
+  border: 1px solid var(--land-border);
+  border-radius: 8px;
+}
+
+.land-preview__unsupported i {
+  font-size: 48px;
+  color: var(--el-color-info);
+}
+
+.land-preview__unsupported h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.land-preview__unsupported .el-button {
+  margin-top: 8px;
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Native media playback: fills the preview area and keeps the video's own
+   controls, which is what makes Range streaming feel instant. */
+.land-media {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  background: #000;
+  border-radius: 8px;
+  border: 1px solid var(--land-border);
+}
+
+.land-media--audio {
+  height: 72px;
+  background: #fff;
+  padding: 8px;
+  align-self: flex-start;
+}

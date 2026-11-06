@@ -55,6 +55,7 @@
 - **搜索**：当前目录递归按文件名，命中数/深度/超时三重上界，超限会如实告诉你"结果不完整"
 - **备注**：管理员给任意文件/目录写一句话说明，全员可见；重命名、移动后备注跟着走
 - **图片缩略图**：列表里直接看缩略图（服务端按需生成，缓存在系统临时目录 `lanDisk-thumbs/`，7 天/512 MB 自清理；不占程序目录、不占进程内存），照片目录不用点开也知道是哪张
+- **视频/音频流式播放**：用浏览器原生播放器，打开即播、拖进度条即时定位，不用等整个文件下载完；WMV/AVI/RMVB 等浏览器解不了的格式会明确提示并给下载入口
 
 ### 👀 预览才是重点
 
@@ -203,7 +204,7 @@ docs/                文档资源
 | 忘记口令 | 到服务器本机执行 `lanDisk.exe reset-password`（没有远程找回，因为不落口令文件） |
 | 服务起不来 | `eventvwr.msc` → Windows 日志 → 应用程序，来源 `LandDisk` |
 | 把自己锁在门外 | 本机 `127.0.0.1` 永远放行；从本机登录后台改 IP 规则 / 并发上限 |
-| 预览打不开（`Setting up fake worker failed` / `Failed to fetch dynamically imported module`） | 说明某条预览链路的 Worker 路径没带 `/file-viewer/` 前缀（1.0.2 及更早的缺陷）。升级到 **1.0.3+**，并 Ctrl+F5 强刷；网络面板里 `/vendor/*`、`/wasm/*` 应为 404，正确路径是 `/file-viewer/...` |
+| 预览报 `Setting up fake worker failed`（URL 里没有 `/file-viewer/` 前缀） | 说明跑的是 1.0.3 之前的老版本。`curl http://<host>/api/health` 看 `version` 与 `preview_assets`（完整构建约 337）；升级到最新版并 Ctrl+F5 |
 | 预览打不开（其他） | 用 Chrome/Edge 近两个大版本；网络面板确认 `/file-viewer/` 下 Worker/WASM 为 200 |
 
 ## 🙏 致谢

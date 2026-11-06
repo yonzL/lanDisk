@@ -53,7 +53,13 @@ ws.addEventListener('message', (event) => {
   if (msg.method === 'Runtime.exceptionThrown') {
     consoleLines.push(`exception: ${msg.params.exceptionDetails.text}`)
   }
-  if (msg.method === 'Network.requestWillBeSent') requests.push(msg.params.request.url)
+  if (msg.method === 'Network.requestWillBeSent') {
+    requests.push(msg.params.request.url)
+    if (msg.params.request.url.includes('/content?')) {
+      const headers = msg.params.request.headers || {}
+      console.log('  [content] Range=' + (headers.Range ?? headers.range ?? '(none)'))
+    }
+  }
 })
 
 const send = (method, params = {}) =>

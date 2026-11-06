@@ -894,3 +894,55 @@ func TestThumbEndpoint(t *testing.T) {
 		t.Fatalf("escaping thumb path = %d, want 404", rec.Code)
 	}
 }
+
+func TestContentStreamsWithRangeAndType(t *testing.T) {
+	srv, cookie := adminWithSession(t)
+	h := srv.Handler()
+	root := t.TempDir()
+	video := bytes.Repeat([]byte("0123456789"), 1000) // 10 KB
+	if err := os.WriteFile(filepath.Join(root, "课程.mp4"), video, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	body := `{"name":"s","virtual_path":"/s","root":` + quoteJSON(root) + `,"root_perm":"r"}`
+	if rec := doJSON(t, h, cookie, http.MethodPost, "/api/admin/shares", body); rec.Code != http.StatusCreated {
+		t.Fatalf("create share = %d %s", rec.Code, rec.Body)
+	}
+
+	rec := doJSON(t, h, nil, http.MethodGet, "/api/shares/1/content?path="+url.QueryEscape("课程.mp4"), "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("content = %d %s", rec.Code, rec.Body)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "video/mp4" {
+		t.Fatalf("content-type = %q, want video/mp4 (browsers refuse to stream octet-stream)", ct)
+	}
+	if cd := rec.Header().Get("Content-Disposition"); cd != "inline" {
+		t.Fatalf("content-disposition = %q, want inline", cd)
+	}
+	if ar := rec.Header().Get("Accept-Ranges"); ar != "bytes" {
+		t.Fatalf("accept-ranges = %q, want bytes", ar)
+	}
+
+	// A Range request must return just that slice: that is what lets a player
+	// start before the whole file is read.
+	req := httptest.NewRequest(http.MethodGet, "/api/shares/1/content?path="+url.QueryEscape("课程.mp4"), nil)
+	req.Header.Set("Range", "bytes=100-199")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusPartialContent {
+		t.Fatalf("range = %d, want 206", rec.Code)
+	}
+	if got := rec.Body.Len(); got != 100 {
+		t.Fatalf("range body = %d bytes, want 100", got)
+	}
+	if cr := rec.Header().Get("Content-Range"); !strings.HasPrefix(cr, "bytes 100-199/") {
+		t.Fatalf("content-range = %q", cr)
+	}
+
+	// Directories and hidden paths stay 404 on the streaming endpoint too.
+	if rec := doJSON(t, h, nil, http.MethodGet, "/api/shares/1/content?path=", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("dir content = %d, want 404", rec.Code)
+	}
+	if rec := doJSON(t, h, nil, http.MethodGet, "/api/shares/1/content?path=.land-trash%2Fx", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("reserved content = %d, want 404", rec.Code)
+	}
+}

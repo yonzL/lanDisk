@@ -93,6 +93,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/uploads/{id}/complete", s.handleUploadComplete())
 	mux.HandleFunc("DELETE /api/uploads/{id}", s.handleUploadAbort())
 	mux.HandleFunc("GET /api/shares/{id}/thumb", s.handleThumb())
+	mux.HandleFunc("GET /api/shares/{id}/content", s.handleContent())
 	mux.HandleFunc("GET /api/shares/{id}/raw", s.handleRaw())
 	mux.HandleFunc("GET /api/shares/{id}/zip", s.handleZip())
 
@@ -122,6 +123,7 @@ type healthResponse struct {
 	Status  string `json:"status"`
 	Version string `json:"version"`
 	Shares  int    `json:"shares"`
+	Assets  int    `json:"preview_assets"`
 	Time    int64  `json:"time"`
 }
 
@@ -138,6 +140,7 @@ func (s *Server) handleHealth() http.HandlerFunc {
 			Version: s.Version,
 			Shares:  shares,
 			Time:    time.Now().Unix(),
+			Assets:  webui.AssetCount(),
 		})
 	}
 }

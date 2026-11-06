@@ -20,9 +20,33 @@ const dirPath = computed(() => {
   parts.pop()
   return parts.join('/')
 })
+// Download keeps the attachment response; the viewer gets the streaming endpoint
+// (inline + correct MIME + Range) so large video starts playing immediately
+// instead of being buffered in full first.
 const rawUrl = computed(
   () => `/api/shares/${shareId.value}/raw?path=${encodeURIComponent(filePath.value)}`,
 )
+const streamUrl = computed(
+  () => `/api/shares/${shareId.value}/content?path=${encodeURIComponent(filePath.value)}`,
+)
+
+// Formats no Chromium-based browser can decode (WMV/WMA, RealVideo, AVI, FLV …).
+// Showing the reason and a download button beats a demuxer error message.
+const UNDECODABLE = /\.(wmv|wma|asf|avi|rmvb?|flv|mpg|mpeg|vob|ts|m2ts|3gp|ogm|divx|xvid)$/i
+const undecodable = computed(() => UNDECODABLE.test(fileName.value))
+
+// Video and audio are played by a native media element instead of FileViewer's
+// media renderer: that renderer is handed the whole file as a buffer, so a 2 GB
+// video would download completely before the first frame. A native <video src>
+// streams over Range requests and starts immediately.
+const PLAYABLE_VIDEO = /\.(mp4|m4v|webm|ogv|mov|mkv)$/i
+const PLAYABLE_AUDIO = /\.(mp3|wav|m4a|aac|flac|ogg|opus)$/i
+const mediaKind = computed<'video' | 'audio' | ''>(() => {
+  if (PLAYABLE_VIDEO.test(fileName.value)) return 'video'
+  if (PLAYABLE_AUDIO.test(fileName.value)) return 'audio'
+  return ''
+})
+const mediaError = ref(false)
 
 const host = ref<HTMLElement | null>(null)
 const wrapper = ref<HTMLElement | null>(null)
@@ -48,7 +72,7 @@ function escapeViewerName(name: string) {
 }
 
 async function mount() {
-  if (!host.value) return
+  if (undecodable.value || mediaKind.value || !host.value) return
   loading.value = true
   error.value = ''
   controller?.destroy()
@@ -70,7 +94,7 @@ async function mount() {
       renderers: [...standardRenderers.renderers, ...engineeringRenderers.renderers],
     }
     controller = mountViewer(host.value, {
-      url: rawUrl.value,
+      url: streamUrl.value,
       // The viewer derives the format from `name`, but it splits the string on
       // '#' and '?' as if it were a URL. A file literally called "#说明.pdf" then
       // becomes "" and falls back to preview.bin (binary inspector). Percent-
@@ -169,7 +193,41 @@ function back() {
     </div>
 
     <el-alert v-if="error" type="error" :closable="false" :title="error" show-icon />
-    <div v-loading="loading" ref="host" class="land-preview__host" />
+
+    <!-- Formats Chromium cannot decode: say so, and offer the download. -->
+    <div v-if="undecodable" class="land-preview__unsupported">
+      <i class="ri-file-video-line" />
+      <h3>浏览器无法播放该格式</h3>
+      <p class="land-muted">
+        {{ fileName }} 使用了浏览器不支持的解码（如 WMV / RealVideo / AVI 等）。
+        请下载后用本地播放器打开。
+      </p>
+      <a :href="rawUrl" class="el-button el-button--primary">下载文件</a>
+    </div>
+
+    <!-- Native media elements stream over Range; the FileViewer media renderer
+         would buffer the whole file first. -->
+    <template v-else-if="mediaKind">
+      <video
+        v-if="mediaKind === 'video'"
+        class="land-media"
+        :src="streamUrl"
+        controls
+        autoplay
+        preload="metadata"
+        @error="mediaError = true"
+      />
+      <audio v-else class="land-media land-media--audio" :src="streamUrl" controls autoplay preload="metadata" @error="mediaError = true" />
+      <el-alert
+        v-if="mediaError"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="无法播放：可能是浏览器不支持的编码（如 H.265 / ProRes / 无损音频），请下载后用本地播放器打开"
+      />
+    </template>
+
+    <div v-else v-loading="loading" ref="host" class="land-preview__host" />
   </div>
 </template>
 
